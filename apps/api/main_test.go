@@ -42,9 +42,11 @@ func TestBuildAlbumListQuery(t *testing.T) {
 	for _, frag := range []string{
 		"year = $1", "aa.artist_id = $2",
 		// q must match the album name, its 한글 display name, credited artist names
-		// (English + 한글), aliases, and track names — one arg, reused placeholder.
+		// (English + 한글), aliases, and track names (English + 한글) — one arg,
+		// reused placeholder.
 		"albums.name ILIKE $3", "albums.display_name ILIKE $3",
-		"ar.name ILIKE $3", "ar.display_name ILIKE $3", "al ILIKE $3", "t.name ILIKE $3",
+		"ar.name ILIKE $3", "ar.display_name ILIKE $3", "al ILIKE $3",
+		"t.name ILIKE $3", "t.display_name ILIKE $3",
 		"(album_type='single' AND total_tracks < 3)", "(album_type='single' AND total_tracks >= 3)", " OR ",
 		"total_tracks DESC", "LIMIT $4", "OFFSET $5",
 	} {

@@ -97,7 +97,9 @@ func main() {
 	mux.HandleFunc("GET /albums/years", s.listYears)
 	mux.HandleFunc("POST /albums", s.requireAdmin(s.createAlbum))
 	mux.HandleFunc("GET /albums/{id}", s.getAlbum)
-	mux.HandleFunc("GET /albums/{id}/tracks", s.listAlbumTracks)
+	// 일반 사용자에겐 Spotify 임베드만 노출한다 — 우리 DB 트랙 목록은 관리자 편집용.
+	mux.HandleFunc("GET /albums/{id}/tracks", s.requireAdmin(s.listAlbumTracks))
+	mux.HandleFunc("PUT /albums/{id}/tracks/{trackId}/display-name", s.requireAdmin(s.updateTrackDisplayName))
 	mux.HandleFunc("PUT /albums/{id}", s.requireAdmin(s.updateAlbum))
 	mux.HandleFunc("PUT /albums/{id}/display-name", s.requireAdmin(s.updateAlbumDisplayName))
 	mux.HandleFunc("DELETE /albums/{id}", s.requireAdmin(s.deleteAlbum))
@@ -239,6 +241,8 @@ func (s *server) ensureAuthSchema(ctx context.Context) error {
 		CREATE INDEX IF NOT EXISTS idx_tracks_album ON tracks(album_id, disc_number, track_number);
 		-- Set once a sync attempt completed (even with 0 tracks); NULL = 백필 대기.
 		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS tracks_synced_at TIMESTAMPTZ;
+		-- 트랙 한글 표시 이름: admin-curated, 동기화(백필)는 절대 덮어쓰지 않는다.
+		ALTER TABLE IF EXISTS tracks ADD COLUMN IF NOT EXISTS display_name TEXT;
 
 		ALTER TABLE IF EXISTS artists ADD COLUMN IF NOT EXISTS image_url TEXT;
 		ALTER TABLE IF EXISTS artists ADD COLUMN IF NOT EXISTS genres TEXT[];

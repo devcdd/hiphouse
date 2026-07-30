@@ -8,6 +8,19 @@ export interface AlbumArtist {
   spotify_url: string | null
 }
 
+// Mirrors the Go `Track` struct (apps/api/tracks.go).
+export interface Track {
+  id: string
+  disc_number: number
+  track_number: number
+  name: string
+  display_name: string | null // 관리자가 등록한 한글명 (없으면 name으로 표시)
+  duration_ms: number | null
+  explicit: boolean
+  spotify_url: string | null
+  artists: { id: string; name: string }[] // 피처링 포함, Spotify 크레딧 순서
+}
+
 export interface Album {
   id: string
   name: string

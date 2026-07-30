@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Pencil } from 'lucide-react'
-import { updateAlbumDisplayName } from '@/entities/album'
+import { updateAlbumDisplayName, updateTrackDisplayName } from '@/entities/album'
 import { updateArtistDisplayName } from '@/entities/artist'
 import { useAuth } from '@/entities/session'
 import styles from './EditDisplayNameButton.module.css'
@@ -14,11 +14,13 @@ export function EditDisplayNameButton({
   id,
   name,
   displayName,
+  albumId,
 }: {
-  kind: 'album' | 'artist'
+  kind: 'album' | 'artist' | 'track'
   id: string
   name: string // Spotify 원본명 — placeholder 및 해제 시 표시될 이름
   displayName: string | null
+  albumId?: string // kind='track'일 때 트랙이 속한 앨범 id (tracks PK가 album_id+id 복합)
 }) {
   const { isAdmin } = useAuth()
   const qc = useQueryClient()
@@ -29,9 +31,15 @@ export function EditDisplayNameButton({
     mutationFn: () =>
       kind === 'album'
         ? updateAlbumDisplayName(id, text.trim())
-        : updateArtistDisplayName(id, text.trim()),
+        : kind === 'artist'
+          ? updateArtistDisplayName(id, text.trim())
+          : updateTrackDisplayName(albumId ?? '', id, text.trim()),
     onSuccess: () => {
       setEditing(false)
+      if (kind === 'track') {
+        qc.invalidateQueries({ queryKey: ['album-tracks', albumId] })
+        return
+      }
       qc.invalidateQueries({ queryKey: [kind, id] })
       qc.invalidateQueries({ queryKey: [`${kind}s`] })
       // 앨범 카드에도 아티스트명이 찍히므로 아티스트 이름이 바뀌면 앨범 목록도 갱신.

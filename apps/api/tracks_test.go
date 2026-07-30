@@ -43,7 +43,7 @@ func TestSpotifyTrackJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, frag := range []string{`"id"`, `"disc_number"`, `"track_number"`, `"name"`,
-		`"duration_ms"`, `"explicit"`, `"spotify_url"`, `"artists":[{"id":"a1"`} {
+		`"display_name"`, `"duration_ms"`, `"explicit"`, `"spotify_url"`, `"artists":[{"id":"a1"`} {
 		if !strings.Contains(string(b), frag) {
 			t.Errorf("missing %s in wire JSON: %s", frag, b)
 		}

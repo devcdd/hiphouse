@@ -25,10 +25,12 @@ type trackArtist struct {
 
 // Track is the public wire shape of one row in the tracks table.
 type Track struct {
-	ID          string        `json:"id" db:"id"`
-	DiscNumber  int           `json:"disc_number" db:"disc_number"`
-	TrackNumber int           `json:"track_number" db:"track_number"`
-	Name        string        `json:"name" db:"name"`
+	ID          string `json:"id" db:"id"`
+	DiscNumber  int    `json:"disc_number" db:"disc_number"`
+	TrackNumber int    `json:"track_number" db:"track_number"`
+	Name        string `json:"name" db:"name"`
+	// 한글 표시 이름 — admin-curated, null by default; 동기화가 덮어쓰지 않는다.
+	DisplayName *string       `json:"display_name" db:"display_name"`
 	DurationMS  *int          `json:"duration_ms" db:"duration_ms"`
 	Explicit    bool          `json:"explicit" db:"explicit"`
 	SpotifyURL  *string       `json:"spotify_url" db:"spotify_url"`
@@ -55,10 +57,11 @@ type spTrackPage struct {
 	Next  *string   `json:"next"`
 }
 
-// GET /albums/{id}/tracks — public tracklist, disc/track order.
+// GET /albums/{id}/tracks — 관리자 전용 tracklist, disc/track order. 일반
+// 사용자에겐 앨범 상세가 Spotify 임베드를 보여준다.
 func (s *server) listAlbumTracks(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.db.Query(r.Context(),
-		`SELECT id,disc_number,track_number,name,duration_ms,explicit,spotify_url,artists
+		`SELECT id,disc_number,track_number,name,display_name,duration_ms,explicit,spotify_url,artists
 		 FROM tracks WHERE album_id=$1 ORDER BY disc_number, track_number, id`, r.PathValue("id"))
 	if err != nil {
 		writeErr(w, 500, err.Error())
@@ -201,14 +204,22 @@ func (s *server) fetchAlbumTracks(ctx context.Context, key, albumID, market stri
 }
 
 // saveAlbumTracks rewrites the album's tracks and stamps tracks_synced_at in
-// one tx — an album is either fully synced or untouched.
+// one tx — an album is either fully synced or untouched. Existing rows are
+// upserted (not delete-all'd) so the admin-curated display_name survives a
+// re-sync; only tracks gone from Spotify are dropped.
 func (s *server) saveAlbumTracks(ctx context.Context, albumID string, tracks []spTrack) error {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback(ctx)
-	if _, err := tx.Exec(ctx, "DELETE FROM tracks WHERE album_id=$1", albumID); err != nil {
+	keep := make([]string, 0, len(tracks))
+	for _, t := range tracks {
+		if t.ID != "" {
+			keep = append(keep, t.ID)
+		}
+	}
+	if _, err := tx.Exec(ctx, "DELETE FROM tracks WHERE album_id=$1 AND NOT (id = ANY($2))", albumID, keep); err != nil {
 		return err
 	}
 	for _, t := range tracks {
@@ -225,7 +236,10 @@ func (s *server) saveAlbumTracks(ctx context.Context, albumID string, tracks []s
 		}
 		if _, err := tx.Exec(ctx,
 			`INSERT INTO tracks(album_id,id,disc_number,track_number,name,duration_ms,explicit,spotify_url,artists)
-			 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(album_id,id) DO NOTHING`,
+			 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
+			 ON CONFLICT(album_id,id) DO UPDATE SET disc_number=EXCLUDED.disc_number,
+			 track_number=EXCLUDED.track_number, name=EXCLUDED.name, duration_ms=EXCLUDED.duration_ms,
+			 explicit=EXCLUDED.explicit, spotify_url=EXCLUDED.spotify_url, artists=EXCLUDED.artists`,
 			albumID, t.ID, t.DiscNumber, t.TrackNumber, t.Name, t.DurationMS, t.Explicit,
 			strPtr(t.ExternalURLs.Spotify), aj); err != nil {
 			return err
@@ -235,4 +249,26 @@ func (s *server) saveAlbumTracks(ctx context.Context, albumID string, tracks []s
 		return err
 	}
 	return tx.Commit(ctx)
+}
+
+// updateTrackDisplayName replaces only the 트랙 한글 표시 이름 (admin-only) — same
+// partial-update shape as updateArtistDisplayName; 동기화는 이 값을 건드리지 않는다.
+func (s *server) updateTrackDisplayName(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		DisplayName *string `json:"display_name"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	tag, err := s.db.Exec(r.Context(), "UPDATE tracks SET display_name=$3 WHERE album_id=$1 AND id=$2",
+		r.PathValue("id"), r.PathValue("trackId"), nilIfBlank(body.DisplayName))
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		writeErr(w, 404, "track not found")
+		return
+	}
+	w.WriteHeader(204)
 }

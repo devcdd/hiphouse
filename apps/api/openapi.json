@@ -18,7 +18,7 @@
         "parameters": [
           { "name": "year", "in": "query", "schema": { "type": "integer" }, "description": "발매 연도로 필터" },
           { "name": "artist_id", "in": "query", "schema": { "type": "string" }, "description": "아티스트 ID로 필터" },
-          { "name": "q", "in": "query", "schema": { "type": "string" }, "description": "검색어 — 앨범명(한글 표시 이름 포함), 크레딧 아티스트명(한글 표시 이름 포함), 아티스트 연관검색어(aliases), 트랙명에 매칭" },
+          { "name": "q", "in": "query", "schema": { "type": "string" }, "description": "검색어 — 앨범명(한글 표시 이름 포함), 크레딧 아티스트명(한글 표시 이름 포함), 아티스트 연관검색어(aliases), 트랙명(한글 표시 이름 포함)에 매칭" },
           { "name": "deleted", "in": "query", "schema": { "type": "string", "enum": ["only"] }, "description": "only = 소프트삭제된 앨범만 (관리자 전용; 비관리자에겐 무시됨)" },
           { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50, "minimum": 1, "maximum": 200 } },
           { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0, "minimum": 0 } }
@@ -80,10 +80,39 @@
       "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
       "get": {
         "tags": ["albums"],
-        "summary": "앨범 트랙 목록",
-        "description": "disc_number, track_number 순 정렬. 아직 트랙 동기화 전인 앨범은 빈 배열.",
+        "summary": "앨범 트랙 목록 (관리자 전용)",
+        "description": "disc_number, track_number 순 정렬. 아직 트랙 동기화 전인 앨범은 빈 배열. 일반 사용자에게는 노출하지 않는다 — 웹은 Spotify 임베드로 트랙리스트를 보여준다.",
         "responses": {
           "200": { "description": "트랙 배열", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Track" } } } } }
+        }
+      }
+    },
+    "/albums/{id}/tracks/{trackId}/display-name": {
+      "parameters": [
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+        { "name": "trackId", "in": "path", "required": true, "schema": { "type": "string" } }
+      ],
+      "put": {
+        "tags": ["albums"],
+        "summary": "트랙 한글 표시 이름만 교체 (관리자 전용)",
+        "description": "동기화(백필)가 관리하는 필드는 건드리지 않는다. 빈 문자열/null이면 해제되어 Spotify 원본명으로 표시된다.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "display_name": { "type": "string", "nullable": true, "example": "새삥" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": { "description": "수정됨" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
     },
@@ -384,6 +413,7 @@
           "disc_number": { "type": "integer", "example": 1 },
           "track_number": { "type": "integer", "example": 3 },
           "name": { "type": "string", "example": "Track Name" },
+          "display_name": { "type": "string", "nullable": true, "description": "관리자가 등록한 한글 표시 이름 — null이면 name으로 표시" },
           "duration_ms": { "type": "integer", "nullable": true, "example": 207959 },
           "explicit": { "type": "boolean" },
           "spotify_url": { "type": "string", "nullable": true },

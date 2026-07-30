@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, RotateCcw, Trash2 } from 'lucide-react'
@@ -13,6 +13,7 @@ import { startKakaoLogin } from '@/features/auth'
 import { apiDelete, apiPost } from '@/shared/api/client'
 import { displayName } from '@/shared/lib/displayName'
 import { AlbumDetailSkeleton } from './AlbumDetailSkeleton'
+import { TrackList } from './TrackList'
 import styles from './AlbumDetailPage.module.css'
 
 export function AlbumDetailPage() {
@@ -23,6 +24,8 @@ export function AlbumDetailPage() {
   const { isAuthed, isAdmin } = useAuth()
   const favIds = useFavoriteIds(isAuthed)
   const ratings = useRatingMap(isAuthed)
+  // 트랙리스트는 기본 접힘 — 펼칠 때 처음 fetch (useAlbumTracks enabled).
+  const [tracksOpen, setTracksOpen] = useState(false)
 
   // Admin soft-delete / restore.
   const toggleDelete = useMutation({
@@ -130,7 +133,7 @@ export function AlbumDetailPage() {
       {album && (
         <section className={styles.tracks}>
           <h2 className={styles.tracksTitle}>트랙리스트</h2>
-          {/* Tracklist data isn't in our DB — embed Spotify's player for the real, playable list. */}
+          {/* 일반/미로그인 사용자에게 보여주는 건 Spotify 임베드뿐 — 실제 재생 가능한 목록. */}
           <iframe
             title="Spotify tracklist"
             className={styles.embed}
@@ -138,6 +141,13 @@ export function AlbumDetailPage() {
             loading="lazy"
             allow="encrypted-media"
           />
+          {/* 우리 DB 트랙 목록은 표시 이름 편집용 — 관리자만 마운트되므로 fetch도 안 나간다. */}
+          {isAdmin && (
+            <details className={styles.adminTracks} onToggle={(e) => setTracksOpen(e.currentTarget.open)}>
+              <summary className={styles.adminTracksToggle}>관리자 트랙 목록</summary>
+              <TrackList albumId={album.id} open={tracksOpen} />
+            </details>
+          )}
         </section>
       )}
 

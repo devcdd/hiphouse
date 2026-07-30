@@ -233,6 +233,99 @@
   border-radius: 12px;
 }
 
+.adminTracks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.adminTracksToggle {
+  width: fit-content;
+  cursor: pointer;
+  user-select: none;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.trackList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.discHeader {
+  margin-top: 12px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.trackRow {
+  display: flex;
+  flex-wrap: wrap; /* 관리자 편집 폼이 좁은 화면에서 다음 줄로 내려가게 */
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--fg) 8%, transparent);
+  font-size: 0.9rem;
+}
+
+.trackNo {
+  flex: none;
+  width: 22px;
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.trackName {
+  flex: 1 1 200px;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.trackName a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.trackName a:hover {
+  text-decoration: underline;
+}
+
+.explicit {
+  user-select: none;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  vertical-align: middle;
+}
+
+.trackArtists {
+  overflow: hidden;
+  max-width: 40%;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.trackDuration {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .state {
   color: var(--muted);
   padding: 24px 0;
