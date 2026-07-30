@@ -14,13 +14,24 @@
   margin: 0;
 }
 
+/* Swiper root (.swiper). Swiper가 overflow/drag/cursor를 소유하므로 최소만 둔다. */
 .tabs {
-  display: flex;
-  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 2px 0;
+  /* 스트립을 끌 때 탭 라벨이 선택되지 않게. */
+  user-select: none;
+  -webkit-user-select: none; /* iOS Safari */
+}
+
+/* slidesPerView="auto" → 슬라이드가 칩 크기에 맞춰진다. */
+.slide {
+  width: auto;
 }
 
 .tab {
   padding: 8px 18px;
+  white-space: nowrap;
   border: none;
   border-radius: 999px;
   background: var(--surface);

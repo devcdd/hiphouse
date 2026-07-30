@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Disc3, Heart, MessageSquare, Star, Trash2, UserPlus, Users, Mic2 } from 'lucide-react'
+import { Disc3, Heart, ListMusic, MessageSquare, Star, Trash2, UserPlus, Users, Mic2 } from 'lucide-react'
 import { fetchAdminStats } from '../api/statsApi'
 import styles from './AdminPage.module.css'
 
@@ -13,6 +13,7 @@ export function StatsTab() {
 
   const cards = [
     { label: '등록된 앨범', value: data.albums, Icon: Disc3 },
+    { label: '트랙', value: data.tracks, Icon: ListMusic },
     { label: '아티스트', value: data.artists, Icon: Mic2 },
     { label: '삭제된 앨범', value: data.deleted_albums, Icon: Trash2 },
     { label: '회원', value: data.users, Icon: Users },

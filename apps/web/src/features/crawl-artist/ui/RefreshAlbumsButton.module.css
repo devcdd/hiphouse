@@ -2,11 +2,17 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 
+/* 키 선택과 한 줄을 나눠 쓰므로 남는 폭을 버튼이 가져간다. nowrap이 없으면
+   좁은 폭에서 "앨범 목록 갱신"이 글자 단위로 접혀 세로로 늘어진다. */
 .btn {
   display: inline-flex;
+  flex: 1 1 auto;
   align-items: center;
+  justify-content: center;
+  white-space: nowrap;
   gap: 6px;
   padding: 8px 14px;
   border: none;

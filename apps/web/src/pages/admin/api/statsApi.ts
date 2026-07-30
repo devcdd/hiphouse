@@ -3,6 +3,7 @@ import { apiGet } from '@/shared/api/client'
 export interface AdminStats {
   albums: number
   deleted_albums: number
+  tracks: number
   artists: number
   users: number
   ratings: number

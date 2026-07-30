@@ -109,8 +109,11 @@
     font-size: 1rem;
   }
 
+  /* 도구마다 한 줄씩. 132px로 눌리면 '앨범 목록 갱신'이 키 선택과 폭을 나눠
+     쓰다가 라벨이 세로로 접힌다. */
   .adminBar > * {
-    flex: 1 1 132px;
+    flex: 1 1 100%;
+    min-width: 0;
     justify-content: center;
   }
 
