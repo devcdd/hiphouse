@@ -247,6 +247,12 @@ func (s *server) ensureAuthSchema(ctx context.Context) error {
 		-- 트랙 한글 표시 이름: admin-curated, 동기화(백필)는 절대 덮어쓰지 않는다.
 		ALTER TABLE IF EXISTS tracks ADD COLUMN IF NOT EXISTS display_name TEXT;
 
+		-- 앨범 full object 메타 (2026-02 API 개편 후 label/popularity는 죽었고,
+		-- copyrights ℗ 문구가 레이블명이 남는 유일한 자리다). GET /albums/{id}를
+		-- 이미 호출하는 트랙 동기화·앨범 단건 추가가 공짜로 채운다.
+		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS upc TEXT;
+		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS copyrights JSONB;
+		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS release_date_precision TEXT;
 		ALTER TABLE IF EXISTS artists ADD COLUMN IF NOT EXISTS image_url TEXT;
 		ALTER TABLE IF EXISTS artists ADD COLUMN IF NOT EXISTS genres TEXT[];
 		ALTER TABLE IF EXISTS artists ADD COLUMN IF NOT EXISTS spotify_url TEXT;

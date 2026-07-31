@@ -176,22 +176,50 @@ type spArtistFull struct {
 	} `json:"external_urls"`
 }
 
+// spCopyright is one ℗/© line. 2026-02 개편으로 label 필드가 죽은 뒤 레이블명이
+// 실려오는 유일한 자리 (예: "℗ 2025 AOMG").
+type spCopyright struct {
+	Text string `json:"text"`
+	Type string `json:"type"`
+}
+
+// spAlbum decodes both the simplified album (/artists/{id}/albums 목록) and the
+// full object (/albums/{id}). upc/copyrights/release_date_precision은 full에만
+// 실려온다 — 없으면 upsert가 기존 값을 보존한다.
 type spAlbum struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	AlbumType   string `json:"album_type"`
-	ReleaseDate string `json:"release_date"`
-	TotalTracks int    `json:"total_tracks"`
-	Images      []struct {
+	ID                   string `json:"id"`
+	Name                 string `json:"name"`
+	AlbumType            string `json:"album_type"`
+	ReleaseDate          string `json:"release_date"`
+	ReleaseDatePrecision string `json:"release_date_precision"`
+	TotalTracks          int    `json:"total_tracks"`
+	Images               []struct {
 		URL string `json:"url"`
 	}
 	ExternalURLs struct {
 		Spotify string `json:"spotify"`
 	} `json:"external_urls"`
-	Artists []struct {
+	ExternalIDs struct {
+		UPC string `json:"upc"`
+	} `json:"external_ids"`
+	Copyrights []spCopyright `json:"copyrights"`
+	Artists    []struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`
 	} `json:"artists"`
+}
+
+// copyrightsJSON marshals the ℗/© lines for the JSONB column; nil = 값 없음
+// (simplified 앨범) → COALESCE가 기존 값을 지킨다.
+func copyrightsJSON(cr []spCopyright) any {
+	if len(cr) == 0 {
+		return nil
+	}
+	b, err := json.Marshal(cr)
+	if err != nil {
+		return nil
+	}
+	return b
 }
 
 func yearOf(release string) *int {
@@ -315,13 +343,18 @@ func upsertAlbums(ctx context.Context, tx pgx.Tx, albums []spAlbum) (map[string]
 			img = strPtr(al.Images[0].URL)
 		}
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO albums(id,name,release_date,year,album_type,total_tracks,image_url,spotify_url)
-			 VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+			`INSERT INTO albums(id,name,release_date,year,album_type,total_tracks,image_url,spotify_url,
+			                    upc,copyrights,release_date_precision)
+			 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
 			 ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name, release_date=EXCLUDED.release_date,
 			   year=EXCLUDED.year, album_type=EXCLUDED.album_type, total_tracks=EXCLUDED.total_tracks,
-			   image_url=EXCLUDED.image_url, spotify_url=EXCLUDED.spotify_url`,
+			   image_url=EXCLUDED.image_url, spotify_url=EXCLUDED.spotify_url,
+			   upc=COALESCE(EXCLUDED.upc, albums.upc),
+			   copyrights=COALESCE(EXCLUDED.copyrights, albums.copyrights),
+			   release_date_precision=COALESCE(EXCLUDED.release_date_precision, albums.release_date_precision)`,
 			al.ID, al.Name, strPtr(al.ReleaseDate), yearOf(al.ReleaseDate), strPtr(al.AlbumType),
-			al.TotalTracks, img, strPtr(al.ExternalURLs.Spotify)); err != nil {
+			al.TotalTracks, img, strPtr(al.ExternalURLs.Spotify),
+			strPtr(al.ExternalIDs.UPC), copyrightsJSON(al.Copyrights), strPtr(al.ReleaseDatePrecision)); err != nil {
 			return nil, err
 		}
 		if _, err := tx.Exec(ctx, "DELETE FROM album_artists WHERE album_id=$1", al.ID); err != nil {
@@ -395,11 +428,11 @@ func (s *server) syncNewAlbumTracks(ctx context.Context, key, market string, alb
 	}
 	synced := 0
 	for _, id := range unsynced {
-		tracks, _, err := s.fetchAlbumTracks(ctx, key, id, market)
+		tracks, meta, _, err := s.fetchAlbumTracks(ctx, key, id, market)
 		if err != nil {
 			continue
 		}
-		if err := s.saveAlbumTracks(ctx, id, tracks); err == nil {
+		if err := s.saveAlbumTracks(ctx, id, tracks, meta); err == nil {
 			synced++
 		}
 	}
@@ -626,3 +659,4 @@ func (s *server) adminSpotifyCrawlAlbum(w http.ResponseWriter, r *http.Request) 
 		"deleted":       deleted, // true = row exists but is soft-deleted; restore it in 삭제된 앨범 탭
 	})
 }
+

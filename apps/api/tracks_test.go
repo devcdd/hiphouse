@@ -49,3 +49,40 @@ func TestSpotifyTrackJSON(t *testing.T) {
 		}
 	}
 }
+
+// Lock the full-album decode fetchAlbumTracks relies on: the embedded spAlbum
+// picks up 메타 (upc/copyrights/precision) while Tracks decodes alongside it,
+// and copyrightsJSON round-trips the ℗/© lines for the JSONB column.
+func TestSpotifyAlbumMetaJSON(t *testing.T) {
+	payload := `{
+		"id":"al1","name":"Album","album_type":"album",
+		"release_date":"2026-07-01","release_date_precision":"day","total_tracks":1,
+		"external_ids":{"upc":"00602557631722"},
+		"copyrights":[{"text":"℗ 2026 AOMG","type":"P"},{"text":"© 2026 AOMG","type":"C"}],
+		"artists":[{"id":"a1","name":"Main"}],
+		"tracks":{"items":[{"id":"t1","name":"Only","disc_number":1,"track_number":1}],"next":null}}`
+	var full struct {
+		spAlbum
+		Tracks spTrackPage `json:"tracks"`
+	}
+	if err := json.Unmarshal([]byte(payload), &full); err != nil {
+		t.Fatal(err)
+	}
+	if full.ExternalIDs.UPC != "00602557631722" || full.ReleaseDatePrecision != "day" {
+		t.Fatalf("meta decode mismatch: %+v", full.spAlbum)
+	}
+	if len(full.Copyrights) != 2 || full.Copyrights[0] != (spCopyright{Text: "℗ 2026 AOMG", Type: "P"}) {
+		t.Fatalf("copyrights decode mismatch: %+v", full.Copyrights)
+	}
+	if len(full.Tracks.Items) != 1 || full.Tracks.Items[0].ID != "t1" {
+		t.Fatalf("tracks decode mismatch: %+v", full.Tracks)
+	}
+
+	b, ok := copyrightsJSON(full.Copyrights).([]byte)
+	if !ok || !strings.Contains(string(b), `"℗ 2026 AOMG"`) {
+		t.Fatalf("copyrightsJSON = %v", copyrightsJSON(full.Copyrights))
+	}
+	if copyrightsJSON(nil) != nil {
+		t.Fatal("copyrightsJSON(nil) should be nil for COALESCE to keep existing values")
+	}
+}

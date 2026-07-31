@@ -301,7 +301,7 @@
       "get": {
         "tags": ["albums"],
         "summary": "트랙 동기화 현황 (관리자)",
-        "description": "삭제되지 않은 앨범 기준. missing = 아직 트랙을 받아오지 않은 앨범 수, tracks = 저장된 전체 트랙 행 수.",
+        "description": "삭제되지 않은 앨범 기준. missing = 트랙 또는 앨범 메타(upc/copyrights/발매일 정밀도)를 아직 받아오지 않은 앨범 수, tracks = 저장된 전체 트랙 행 수.",
         "responses": {
           "200": { "description": "{albums, synced, missing, tracks}", "content": { "application/json": { "schema": { "type": "object", "properties": {
             "albums": { "type": "integer" }, "synced": { "type": "integer" },
@@ -314,7 +314,7 @@
       "post": {
         "tags": ["albums"],
         "summary": "트랙 백필 배치 실행 (관리자)",
-        "description": "트랙 미동기화 앨범을 최신 발매순으로 최대 limit개 처리 (앨범당 Spotify 요청 1회, 앨범별 커밋). 404 앨범은 빈 트랙으로 완료 처리. 그 외 Spotify 오류는 배치를 중단하고 진행분과 함께 error로 보고. remaining이 0이 될 때까지 반복 호출.",
+        "description": "트랙 미동기화 또는 앨범 메타(upc/copyrights/발매일 정밀도) 미수집 앨범을 최신 발매순으로 최대 limit개 처리 (앨범당 Spotify 요청 1회, 앨범별 커밋) — 같은 full object 응답에서 트랙과 메타를 함께 저장한다. 404 앨범은 빈 트랙으로 완료 처리. 그 외 Spotify 오류는 배치를 중단하고 진행분과 함께 error로 보고. remaining이 0이 될 때까지 반복 호출.",
         "requestBody": {
           "required": true,
           "content": { "application/json": { "schema": { "type": "object", "properties": {
