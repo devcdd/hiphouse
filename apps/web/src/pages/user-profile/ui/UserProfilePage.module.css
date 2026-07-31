@@ -1,0 +1,59 @@
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px 24px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.stats {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+}
+
+/* 가입일은 통계와 같은 줄이되 좁은 화면에선 자연스럽게 다음 줄로 넘어간다. */
+.joined {
+  margin-left: 6px;
+  font-size: 0.78rem;
+  opacity: 0.75;
+}
+
+.section {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 28px 20px;
+}
+
+.item {
+  position: relative;
+}
+
+.state {
+  color: var(--muted);
+  padding: 8px 0;
+}

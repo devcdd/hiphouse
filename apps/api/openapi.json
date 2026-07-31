@@ -8,7 +8,8 @@
   "servers": [{ "url": "/" }],
   "tags": [
     { "name": "albums" },
-    { "name": "artists" }
+    { "name": "artists" },
+    { "name": "users" }
   ],
   "paths": {
     "/albums": {
@@ -139,6 +140,62 @@
           "204": { "description": "수정됨" },
           "400": { "$ref": "#/components/responses/BadRequest" },
           "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/users/{id}": {
+      "get": {
+        "tags": ["users"],
+        "summary": "공개 프로필",
+        "description": "닉네임·가입일과 평가/댓글 집계. 로그인 없이 조회 가능. user_id와 nickname은 댓글 API가 이미 공개하는 값이다.",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": {
+            "description": "프로필",
+            "content": { "application/json": { "schema": { "type": "object", "properties": {
+              "id": { "type": "string" }, "nickname": { "type": "string" },
+              "created_at": { "type": "string", "format": "date-time" },
+              "rating_count": { "type": "integer" },
+              "rating_avg": { "type": "number", "nullable": true, "description": "별점 0..5. 평가가 없으면 null" },
+              "comment_count": { "type": "integer" }
+            } } } }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/users/{id}/ratings": {
+      "get": {
+        "tags": ["users"],
+        "summary": "그 사용자가 평가한 앨범",
+        "description": "앨범 행에 그 사용자가 준 score(하프스타 1..10)를 얹어 최근 평가순으로 반환. 삭제된 앨범은 제외.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "앨범 배열 (Album + score)",
+            "content": { "application/json": { "schema": { "type": "array", "items": {
+              "allOf": [
+                { "$ref": "#/components/schemas/Album" },
+                { "type": "object", "properties": { "score": { "type": "integer", "minimum": 1, "maximum": 10 } } }
+              ]
+            } } } }
+          }
+        }
+      }
+    },
+    "/og/albums/{id}": {
+      "get": {
+        "tags": ["albums"],
+        "summary": "링크 스크래퍼용 메타 프리렌더 (HTML)",
+        "description": "og:/twitter: 메타만 담은 HTML을 반환한다. nginx가 스크래퍼 User-Agent의 /albums/{id} 요청만 여기로 넘기고 사람은 SPA를 받는다. og:url·canonical은 PUBLIC_ORIGIN(없으면 X-Forwarded-Proto/Host)으로 만든다. 삭제되었거나 없는 앨범은 404.",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "메타 태그 HTML", "content": { "text/html": { "schema": { "type": "string" } } } },
+          "404": { "description": "없거나 삭제된 앨범" }
         }
       }
     },

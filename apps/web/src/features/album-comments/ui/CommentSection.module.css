@@ -146,10 +146,16 @@
   color: var(--muted);
 }
 
+/* 공개 프로필 링크. 밑줄은 hover에서만 — 댓글 헤더가 링크투성이로 보이면 산만하다. */
 .nickname {
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--fg);
+  text-decoration: none;
+}
+
+.nickname:hover {
+  text-decoration: underline;
 }
 
 .iconBtn {
