@@ -128,6 +128,7 @@ func main() {
 	mux.HandleFunc("PUT /artists/{id}", s.requireAdmin(s.updateArtist))
 	mux.HandleFunc("PUT /artists/{id}/aliases", s.requireAdmin(s.updateArtistAliases))
 	mux.HandleFunc("PUT /artists/{id}/display-name", s.requireAdmin(s.updateArtistDisplayName))
+	mux.HandleFunc("PUT /artists/{id}/releases-watch", s.requireAdmin(s.updateArtistReleasesWatch))
 	mux.HandleFunc("POST /artists/merge", s.requireAdmin(s.mergeArtists))
 	mux.HandleFunc("DELETE /artists/{id}", s.requireAdmin(s.deleteArtist))
 
@@ -275,6 +276,23 @@ func (s *server) ensureAuthSchema(ctx context.Context) error {
 		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS release_date_precision TEXT;
 		-- 신보 체크: 아티스트별 마지막 확인 시각. NULL = 아직 한 번도 안 봄.
 		ALTER TABLE IF EXISTS artists ADD COLUMN IF NOT EXISTS releases_checked_at TIMESTAMPTZ;
+
+		-- 신보 감시 플래그: 신보 체크는 이 플래그가 켜진 아티스트만 본다. position=0
+		-- 휴리스틱만으로는 콜라보/컴필 싱글(스노우볼 프로젝트, 월간 윤종신 등)의 첫
+		-- 크레딧으로 들어온 비힙합 아티스트가 뚫려서(프로드에서 실제 발생) 명시
+		-- 플래그로 전환. 컬럼 신설 시 1회만 시드: 대표 크레딧 앨범 3개 이상 보유
+		-- 아티스트(사실상 로스터) — 이후 값은 관리자 토글이 소유하므로 재실행 금지.
+		DO $$
+		BEGIN
+			IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'artists')
+			   AND NOT EXISTS (SELECT 1 FROM information_schema.columns
+			                   WHERE table_name = 'artists' AND column_name = 'releases_watch') THEN
+				ALTER TABLE artists ADD COLUMN releases_watch BOOLEAN NOT NULL DEFAULT false;
+				UPDATE artists a SET releases_watch = true
+				WHERE (SELECT COUNT(*) FROM album_artists aa JOIN albums al ON al.id = aa.album_id
+				       WHERE aa.artist_id = a.id AND aa.position = 0 AND al.deleted_at IS NULL) >= 3;
+			END IF;
+		END $$;
 
 		ALTER TABLE IF EXISTS artists ADD COLUMN IF NOT EXISTS image_url TEXT;
 		ALTER TABLE IF EXISTS artists ADD COLUMN IF NOT EXISTS genres TEXT[];

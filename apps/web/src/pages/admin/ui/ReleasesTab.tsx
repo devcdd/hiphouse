@@ -195,8 +195,8 @@ export function ReleasesTab() {
       )}
       <p className={styles.state}>
         <Disc3 size={13} aria-hidden style={{ verticalAlign: '-2px', marginRight: 4 }} />
-        아티스트당 Spotify 앨범 목록 첫 페이지(최신 10장)를 비교해 DB에 없는 앨범만 추가합니다. 삭제한 앨범은
-        되살리지 않습니다.
+        신보 감시가 켜진 아티스트만 확인합니다 (아티스트 상세의 「신보 감시」 버튼으로 관리). 아티스트당 Spotify
+        앨범 목록 첫 페이지(최신 10장)를 비교해 DB에 없는 앨범만 추가하며, 삭제한 앨범은 되살리지 않습니다.
       </p>
     </div>
   )

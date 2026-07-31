@@ -671,14 +671,11 @@ func (s *server) adminSpotifyCrawlAlbum(w http.ResponseWriter, r *http.Request) 
 
 // ---- 신보 체크 (release check) — 삭제된 /browse/new-releases의 로스터 기반 대체 ----
 
-// releaseEligibleSQL: live 앨범의 대표 크레딧(position=0)을 가진 아티스트만 체크
-// 대상 — 사실상의 로스터. 앨범 단위 피처링("Juicy (feat. Colde)"의 Colde,
-// position≥1)이나 트랙 크레딧(tracks.artists JSONB)에만 등장하는 아티스트는
-// 제외된다. position 조건이 없으면 피처링된 발라드 가수의 OST까지 신보로
-// 딸려온다 (E2E에서 실제로 확인).
-const releaseEligibleSQL = `FROM artists a WHERE EXISTS (
-	SELECT 1 FROM album_artists aa JOIN albums al ON al.id = aa.album_id
-	WHERE aa.artist_id = a.id AND aa.position = 0 AND al.deleted_at IS NULL)`
+// releaseEligibleSQL: 관리자가 신보 감시를 켠 아티스트만 체크 대상. 크레딧
+// 휴리스틱(position=0)은 콜라보/컴필 싱글의 첫 크레딧으로 들어온 비힙합
+// 아티스트(크라잉넛·윤종신 케이스)가 뚫려서 명시 플래그로 교체 — 초기값은
+// 마이그레이션이 대표 크레딧 앨범 수로 시드하고, 이후는 아티스트 상세 토글이 관리.
+const releaseEligibleSQL = `FROM artists a WHERE a.releases_watch`
 
 // 20시간 주기: 매일 같은 시각쯤 돌려도 어제 체크분이 다시 대상이 된다.
 const releaseStaleSQL = releaseEligibleSQL +

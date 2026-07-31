@@ -359,7 +359,7 @@
       "get": {
         "tags": ["artists"],
         "summary": "신보 체크 현황 (관리자)",
-        "description": "artists = live 앨범을 보유한 체크 대상 아티스트 수, stale = 이번 주기(20시간) 내 아직 확인하지 않은 아티스트 수.",
+        "description": "artists = 신보 감시(releases_watch)가 켜진 체크 대상 아티스트 수, stale = 이번 주기(20시간) 내 아직 확인하지 않은 아티스트 수.",
         "responses": {
           "200": { "description": "{artists, stale}", "content": { "application/json": { "schema": { "type": "object", "properties": {
             "artists": { "type": "integer" }, "stale": { "type": "integer" }
@@ -371,7 +371,7 @@
       "post": {
         "tags": ["artists"],
         "summary": "신보 감지 배치 실행 (관리자)",
-        "description": "DB 보유 아티스트를 오래 안 본 순서대로 최대 limit명 확인 (아티스트당 Spotify 요청 1회 — 앨범 목록 첫 페이지 10장). DB에 없는 앨범만 저장하고 enrich·트랙 동기화까지 이어서 수행. 소프트 삭제된 앨범은 되살리지 않는다. Spotify 오류 시 배치를 중단하고 진행분과 함께 error로 보고 — 실패한 아티스트는 다음 호출이 다시 집는다. remaining이 0이 될 때까지 반복 호출.",
+        "description": "신보 감시(releases_watch)가 켜진 아티스트를 오래 안 본 순서대로 최대 limit명 확인 (아티스트당 Spotify 요청 1회 — 앨범 목록 첫 페이지 10장). DB에 없는 앨범만 저장하고 enrich·트랙 동기화까지 이어서 수행. 소프트 삭제된 앨범은 되살리지 않는다. Spotify 오류 시 배치를 중단하고 진행분과 함께 error로 보고 — 실패한 아티스트는 다음 호출이 다시 집는다. remaining이 0이 될 때까지 반복 호출.",
         "requestBody": {
           "required": true,
           "content": { "application/json": { "schema": { "type": "object", "properties": {
@@ -493,6 +493,33 @@
           "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
+    },
+    "/artists/{id}/releases-watch": {
+      "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+      "put": {
+        "tags": ["artists"],
+        "summary": "신보 감시 플래그만 교체 (관리자 전용)",
+        "description": "신보 체크 대상 여부. 다른 필드는 건드리지 않는다.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["watch"],
+                "properties": {
+                  "watch": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": { "description": "수정됨" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
     }
   },
   "components": {
@@ -533,6 +560,7 @@
           "spotify_url": { "type": "string", "nullable": true, "description": "Spotify 아티스트 프로필 URL" },
           "aliases": { "type": "array", "items": { "type": "string" }, "nullable": true, "description": "연관검색어 — 관리자가 등록한 검색 키워드 (예: 영문명의 한글 표기). 검색 시 name과 함께 매칭됨" },
           "followers": { "type": "integer", "nullable": true, "description": "Spotify 팔로워 수 — 크롤러/enrich가 채움 (아직 수집 전이면 null). 화면 표시용이 아니라 관리자 enrich 판단용" },
+          "releases_watch": { "type": "boolean", "description": "신보 감시 대상 여부 — 신보 체크가 이 플래그 켜진 아티스트만 확인. 관리자 토글 소유" },
           "follower_count": { "type": "integer", "description": "서비스 내부 팔로워 수 — follows 테이블 집계" }
         }
       },

@@ -21,6 +21,11 @@ export function updateArtistDisplayName(id: string, displayName: string): Promis
   return apiPut<void>(`/artists/${encodeURIComponent(id)}/display-name`, { display_name: displayName })
 }
 
+// Admin: 신보 감시 플래그만 교체 — 신보 체크 탭이 확인하는 대상을 결정한다.
+export function updateArtistReleasesWatch(id: string, watch: boolean): Promise<void> {
+  return apiPut<void>(`/artists/${encodeURIComponent(id)}/releases-watch`, { watch })
+}
+
 export type DeleteMode = 'soft' | 'hard'
 
 // Admin: 'soft' keeps the artist and only soft-deletes the albums they are the
