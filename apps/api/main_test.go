@@ -36,17 +36,17 @@ func TestBuildAlbumListQuery(t *testing.T) {
 	y := 2024
 	// Multi-type (single OR ep): predicates inlined (no args), so placeholders stay year/artist/q + limit/offset.
 	sql, args := buildAlbumListQuery(&y, "abc", "dre", []string{"single", "ep"}, "tracks", "hide", 10, 5)
-	if want := []any{2024, "abc", "%dre%", 10, 5}; !eq(args, want) {
+	if want := []any{2024, "abc", `\mdre`, 10, 5}; !eq(args, want) {
 		t.Fatalf("args = %v, want %v", args, want)
 	}
 	for _, frag := range []string{
 		"year = $1", "aa.artist_id = $2",
 		// q must match the album name, its 한글 display name, credited artist names
 		// (English + 한글), aliases, and track names (English + 한글) — one arg,
-		// reused placeholder.
-		"albums.name ILIKE $3", "albums.display_name ILIKE $3",
-		"ar.name ILIKE $3", "ar.display_name ILIKE $3", "al ILIKE $3",
-		"t.name ILIKE $3", "t.display_name ILIKE $3",
+		// reused placeholder. Latin queries use the word-start regex operator.
+		"albums.name ~* $3", "albums.display_name ~* $3",
+		"ar.name ~* $3", "ar.display_name ~* $3", "al ~* $3",
+		"t.name ~* $3", "t.display_name ~* $3",
 		"(album_type='single' AND total_tracks < 3)", "(album_type='single' AND total_tracks >= 3)", " OR ",
 		"total_tracks DESC", "LIMIT $4", "OFFSET $5",
 	} {
@@ -92,6 +92,28 @@ func TestBuildAlbumListQuery(t *testing.T) {
 	sql, _ = buildAlbumListQuery(nil, "", "", nil, "", "only", 50, 0)
 	if !strings.Contains(sql, "albums.deleted_at IS NOT NULL") {
 		t.Errorf("only mode should filter to deleted rows: %s", sql)
+	}
+}
+
+// Latin queries anchor at word starts; 한글 queries keep infix matching.
+func TestSearchMatch(t *testing.T) {
+	for _, tc := range []struct{ q, op, val string }{
+		// ASCII → case-insensitive word-start regex: "ander" must not match
+		// mid-word ("wandering", "Neanderthal", alias "Kim Ximya X D. Sanders").
+		{"ander", " ~* ", `\mander`},
+		// Regex metacharacters in the query are literals, not syntax.
+		{"d. sanders", " ~* ", `\md\. sanders`},
+		// Non-ASCII (한글) → infix ILIKE: "심야" must still find "김심야".
+		{"심야", " ILIKE ", "%심야%"},
+		// A leading non-word char can't sit after \m (it never matches) → infix.
+		{".paak", " ILIKE ", "%.paak%"},
+		// User-typed LIKE wildcards are escaped to literals on the infix path.
+		{"백%_문", " ILIKE ", `%백\%\_문%`},
+	} {
+		op, val := searchMatch(tc.q)
+		if op != tc.op || val != tc.val {
+			t.Errorf("searchMatch(%q) = %q %q, want %q %q", tc.q, op, val, tc.op, tc.val)
+		}
 	}
 }
 

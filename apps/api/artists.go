@@ -44,10 +44,13 @@ func (s *server) listArtists(w http.ResponseWriter, r *http.Request) {
 	// q matches the artist name, the 한글 표시 이름, OR any admin-curated alias
 	// (연관검색어), so a Korean query finds artists stored under an English name.
 	if q := r.URL.Query().Get("q"); q != "" {
-		args = append(args, "%"+q+"%")
+		// Same matching rules as the album search (word-start for Latin queries,
+		// infix for 한글) — see searchMatch.
+		op, val := searchMatch(q)
+		args = append(args, val)
 		p := "$" + strconv.Itoa(len(args))
-		sql += " AND (name ILIKE " + p + " OR display_name ILIKE " + p +
-			" OR EXISTS (SELECT 1 FROM unnest(COALESCE(aliases,'{}'::text[])) AS al WHERE al ILIKE " + p + "))"
+		sql += " AND (name" + op + p + " OR display_name" + op + p +
+			" OR EXISTS (SELECT 1 FROM unnest(COALESCE(aliases,'{}'::text[])) AS al WHERE al" + op + p + "))"
 	}
 	args = append(args, limit)
 	// Sort by what the UI actually shows (한글명이 있으면 그 이름).
