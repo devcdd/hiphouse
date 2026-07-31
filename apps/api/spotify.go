@@ -176,22 +176,50 @@ type spArtistFull struct {
 	} `json:"external_urls"`
 }
 
+// spCopyright is one ℗/© line. 2026-02 개편으로 label 필드가 죽은 뒤 레이블명이
+// 실려오는 유일한 자리 (예: "℗ 2025 AOMG").
+type spCopyright struct {
+	Text string `json:"text"`
+	Type string `json:"type"`
+}
+
+// spAlbum decodes both the simplified album (/artists/{id}/albums 목록) and the
+// full object (/albums/{id}). upc/copyrights/release_date_precision은 full에만
+// 실려온다 — 없으면 upsert가 기존 값을 보존한다.
 type spAlbum struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	AlbumType   string `json:"album_type"`
-	ReleaseDate string `json:"release_date"`
-	TotalTracks int    `json:"total_tracks"`
-	Images      []struct {
+	ID                   string `json:"id"`
+	Name                 string `json:"name"`
+	AlbumType            string `json:"album_type"`
+	ReleaseDate          string `json:"release_date"`
+	ReleaseDatePrecision string `json:"release_date_precision"`
+	TotalTracks          int    `json:"total_tracks"`
+	Images               []struct {
 		URL string `json:"url"`
 	}
 	ExternalURLs struct {
 		Spotify string `json:"spotify"`
 	} `json:"external_urls"`
-	Artists []struct {
+	ExternalIDs struct {
+		UPC string `json:"upc"`
+	} `json:"external_ids"`
+	Copyrights []spCopyright `json:"copyrights"`
+	Artists    []struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`
 	} `json:"artists"`
+}
+
+// copyrightsJSON marshals the ℗/© lines for the JSONB column; nil = 값 없음
+// (simplified 앨범) → COALESCE가 기존 값을 지킨다.
+func copyrightsJSON(cr []spCopyright) any {
+	if len(cr) == 0 {
+		return nil
+	}
+	b, err := json.Marshal(cr)
+	if err != nil {
+		return nil
+	}
+	return b
 }
 
 func yearOf(release string) *int {
@@ -315,13 +343,18 @@ func upsertAlbums(ctx context.Context, tx pgx.Tx, albums []spAlbum) (map[string]
 			img = strPtr(al.Images[0].URL)
 		}
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO albums(id,name,release_date,year,album_type,total_tracks,image_url,spotify_url)
-			 VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+			`INSERT INTO albums(id,name,release_date,year,album_type,total_tracks,image_url,spotify_url,
+			                    upc,copyrights,release_date_precision)
+			 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
 			 ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name, release_date=EXCLUDED.release_date,
 			   year=EXCLUDED.year, album_type=EXCLUDED.album_type, total_tracks=EXCLUDED.total_tracks,
-			   image_url=EXCLUDED.image_url, spotify_url=EXCLUDED.spotify_url`,
+			   image_url=EXCLUDED.image_url, spotify_url=EXCLUDED.spotify_url,
+			   upc=COALESCE(EXCLUDED.upc, albums.upc),
+			   copyrights=COALESCE(EXCLUDED.copyrights, albums.copyrights),
+			   release_date_precision=COALESCE(EXCLUDED.release_date_precision, albums.release_date_precision)`,
 			al.ID, al.Name, strPtr(al.ReleaseDate), yearOf(al.ReleaseDate), strPtr(al.AlbumType),
-			al.TotalTracks, img, strPtr(al.ExternalURLs.Spotify)); err != nil {
+			al.TotalTracks, img, strPtr(al.ExternalURLs.Spotify),
+			strPtr(al.ExternalIDs.UPC), copyrightsJSON(al.Copyrights), strPtr(al.ReleaseDatePrecision)); err != nil {
 			return nil, err
 		}
 		if _, err := tx.Exec(ctx, "DELETE FROM album_artists WHERE album_id=$1", al.ID); err != nil {
@@ -395,24 +428,27 @@ func (s *server) syncNewAlbumTracks(ctx context.Context, key, market string, alb
 	}
 	synced := 0
 	for _, id := range unsynced {
-		tracks, _, err := s.fetchAlbumTracks(ctx, key, id, market)
+		tracks, meta, _, err := s.fetchAlbumTracks(ctx, key, id, market)
 		if err != nil {
 			continue
 		}
-		if err := s.saveAlbumTracks(ctx, id, tracks); err == nil {
+		if err := s.saveAlbumTracks(ctx, id, tracks, meta); err == nil {
 			synced++
 		}
 	}
 	return synced
 }
 
-// POST /admin/spotify/crawl {artist_id, key} — pull every album of the artist
-// into the DB (same rules as the crawler: 0 albums → artist not saved; every
-// credited artist gets a row + join credits; missing images get enriched).
+// POST /admin/spotify/crawl {artist_id, key, appears_on} — pull every album of
+// the artist into the DB (same rules as the crawler: 0 albums → artist not
+// saved; every credited artist gets a row + join credits; missing images get
+// enriched). appears_on=true widens include_groups to 참여·컴필레이션 앨범
+// (쇼미더머니류) — noisy, so it's an explicit admin toggle, never the default.
 func (s *server) adminSpotifyCrawl(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		ArtistID string `json:"artist_id"`
-		Key      string `json:"key"`
+		ArtistID  string `json:"artist_id"`
+		Key       string `json:"key"`
+		AppearsOn bool   `json:"appears_on"`
 	}
 	if !decode(w, r, &body) {
 		return
@@ -422,10 +458,14 @@ func (s *server) adminSpotifyCrawl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	market := env("MARKET", "KR")
+	groups := "album,single"
+	if body.AppearsOn {
+		groups += ",appears_on,compilation"
+	}
 
 	// Page through the artist's albums (limit is capped at ~10 for client-credentials apps).
 	albums := map[string]spAlbum{}
-	next := spAPI + "/artists/" + url.PathEscape(body.ArtistID) + "/albums?include_groups=album,single&market=" + url.QueryEscape(market) + "&limit=10"
+	next := spAPI + "/artists/" + url.PathEscape(body.ArtistID) + "/albums?include_groups=" + url.QueryEscape(groups) + "&market=" + url.QueryEscape(market) + "&limit=10"
 	for next != "" {
 		var page struct {
 			Items []spAlbum `json:"items"`
@@ -627,4 +667,183 @@ func (s *server) adminSpotifyCrawlAlbum(w http.ResponseWriter, r *http.Request) 
 		"tracks_synced": tracksSynced,
 		"deleted":       deleted, // true = row exists but is soft-deleted; restore it in 삭제된 앨범 탭
 	})
+}
+
+// ---- 신보 체크 (release check) — 삭제된 /browse/new-releases의 로스터 기반 대체 ----
+
+// releaseEligibleSQL: live 앨범의 대표 크레딧(position=0)을 가진 아티스트만 체크
+// 대상 — 사실상의 로스터. 앨범 단위 피처링("Juicy (feat. Colde)"의 Colde,
+// position≥1)이나 트랙 크레딧(tracks.artists JSONB)에만 등장하는 아티스트는
+// 제외된다. position 조건이 없으면 피처링된 발라드 가수의 OST까지 신보로
+// 딸려온다 (E2E에서 실제로 확인).
+const releaseEligibleSQL = `FROM artists a WHERE EXISTS (
+	SELECT 1 FROM album_artists aa JOIN albums al ON al.id = aa.album_id
+	WHERE aa.artist_id = a.id AND aa.position = 0 AND al.deleted_at IS NULL)`
+
+// 20시간 주기: 매일 같은 시각쯤 돌려도 어제 체크분이 다시 대상이 된다.
+const releaseStaleSQL = releaseEligibleSQL +
+	` AND (a.releases_checked_at IS NULL OR a.releases_checked_at < now() - interval '20 hours')`
+
+// GET /admin/spotify/releases-status — 신보 체크 현황 (대상/이번 주기 대기).
+func (s *server) adminReleasesStatus(w http.ResponseWriter, r *http.Request) {
+	var artists, stale int
+	if err := s.db.QueryRow(r.Context(), "SELECT COUNT(*)::int "+releaseEligibleSQL).Scan(&artists); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	if err := s.db.QueryRow(r.Context(), "SELECT COUNT(*)::int "+releaseStaleSQL).Scan(&stale); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, map[string]int{"artists": artists, "stale": stale})
+}
+
+type releaseCheckItem struct {
+	ID     string   `json:"id"`
+	Name   *string  `json:"name"`
+	Albums []string `json:"albums"` // 이번에 새로 담은 앨범 이름들
+}
+
+type releaseCheckResult struct {
+	Checked      int                `json:"checked"`   // 이번 배치에서 확인한 아티스트 수
+	NewAlbums    int                `json:"new_albums"`
+	Enriched     int                `json:"enriched"`
+	TracksSynced int                `json:"tracks_synced"`
+	Remaining    int                `json:"remaining"` // 이번 주기에 아직 안 본 아티스트 수
+	Artists      []releaseCheckItem `json:"artists"`   // 신보가 있던 아티스트만
+	Error        *string            `json:"error,omitempty"`
+}
+
+// POST /admin/spotify/check-releases {key, limit} — DB 보유 아티스트를 오래 안 본
+// 순서대로 limit명 골라 신보를 감지한다. 아티스트당 Spotify 요청 1회: 앨범 목록
+// 첫 페이지(최신순 10장)만 본다 — 한 주기에 10장 넘게 내는 아티스트는 없다.
+// DB에 행이 아예 없는 앨범만 저장하므로 관리자가 삭제한 앨범(soft-delete 행
+// 존재)은 되살아나지 않는다. 트랙 백필과 같은 배치 계약: Spotify 오류가 나면
+// 멈추고 부분 진행을 보고하며, 실패한 아티스트는 스탬프가 안 찍혀 다음 호출이
+// 다시 집는다. 아티스트 자체가 Spotify에서 사라진 404는 스탬프만 찍고 넘어간다.
+func (s *server) adminCheckReleases(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Key   string `json:"key"`
+		Limit int    `json:"limit"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	if body.Limit < 1 || body.Limit > 50 {
+		body.Limit = 10
+	}
+	market := env("MARKET", "KR")
+
+	rows, err := s.db.Query(r.Context(),
+		"SELECT a.id, COALESCE(a.display_name, a.name) "+releaseStaleSQL+
+			" ORDER BY a.releases_checked_at NULLS FIRST, a.id LIMIT $1", body.Limit)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	type candidate struct {
+		ID   string
+		Name *string
+	}
+	pending, err := pgx.CollectRows(rows, pgx.RowToStructByPos[candidate])
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+
+	res := releaseCheckResult{Artists: []releaseCheckItem{}}
+	credited := map[string]bool{}
+	var newAlbumIDs []string
+	for _, ar := range pending {
+		var page struct {
+			Items []spAlbum `json:"items"`
+		}
+		u := spAPI + "/artists/" + url.PathEscape(ar.ID) + "/albums?include_groups=album,single&market=" + url.QueryEscape(market) + "&limit=10"
+		if err := s.spGet(r.Context(), body.Key, u, &page); err != nil {
+			var se *spError
+			if !errors.As(err, &se) || se.Status != 404 {
+				name := ar.ID
+				if ar.Name != nil {
+					name = *ar.Name
+				}
+				res.Error = strPtr(fmt.Sprintf("%s: %v", name, err))
+				break
+			}
+			page.Items = nil // 아티스트가 Spotify에서 사라짐 — 볼 신보 없음
+		}
+
+		ids := make([]string, 0, len(page.Items))
+		for _, al := range page.Items {
+			ids = append(ids, al.ID)
+		}
+		existing := map[string]bool{}
+		if len(ids) > 0 {
+			erows, err := s.db.Query(r.Context(), "SELECT id FROM albums WHERE id = ANY($1)", ids)
+			if err != nil {
+				writeErr(w, 500, err.Error())
+				return
+			}
+			got, err := pgx.CollectRows(erows, pgx.RowTo[string])
+			if err != nil {
+				writeErr(w, 500, err.Error())
+				return
+			}
+			for _, id := range got {
+				existing[id] = true
+			}
+		}
+		fresh := make([]spAlbum, 0, len(page.Items))
+		for _, al := range page.Items {
+			if !existing[al.ID] {
+				fresh = append(fresh, al)
+			}
+		}
+
+		if len(fresh) > 0 {
+			tx, err := s.db.Begin(r.Context())
+			if err != nil {
+				writeErr(w, 500, err.Error())
+				return
+			}
+			cr, err := upsertAlbums(r.Context(), tx, fresh)
+			if err != nil {
+				tx.Rollback(r.Context())
+				writeErr(w, 500, err.Error())
+				return
+			}
+			if err := tx.Commit(r.Context()); err != nil {
+				writeErr(w, 500, err.Error())
+				return
+			}
+			for id := range cr {
+				credited[id] = true
+			}
+			item := releaseCheckItem{ID: ar.ID, Name: ar.Name, Albums: make([]string, 0, len(fresh))}
+			for _, al := range fresh {
+				newAlbumIDs = append(newAlbumIDs, al.ID)
+				item.Albums = append(item.Albums, al.Name)
+			}
+			res.Artists = append(res.Artists, item)
+			res.NewAlbums += len(fresh)
+		}
+
+		if _, err := s.db.Exec(r.Context(), "UPDATE artists SET releases_checked_at=now() WHERE id=$1", ar.ID); err != nil {
+			writeErr(w, 500, err.Error())
+			return
+		}
+		res.Checked++
+	}
+
+	if len(credited) > 0 {
+		res.Enriched = s.enrichCredited(r.Context(), body.Key, credited)
+	}
+	if len(newAlbumIDs) > 0 {
+		res.TracksSynced = s.syncNewAlbumTracks(r.Context(), body.Key, market, newAlbumIDs)
+	}
+
+	if err := s.db.QueryRow(r.Context(), "SELECT COUNT(*)::int "+releaseStaleSQL).Scan(&res.Remaining); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, res)
 }

@@ -145,6 +145,10 @@ func main() {
 	mux.HandleFunc("GET /admin/spotify/albums", s.requireAdmin(s.adminSpotifyAlbumSearch))
 	mux.HandleFunc("POST /admin/spotify/crawl-album", s.requireAdmin(s.adminSpotifyCrawlAlbum))
 
+	// Admin 신보 체크 — DB 보유 아티스트의 새 앨범을 배치로 감지해 자동 추가
+	mux.HandleFunc("GET /admin/spotify/releases-status", s.requireAdmin(s.adminReleasesStatus))
+	mux.HandleFunc("POST /admin/spotify/check-releases", s.requireAdmin(s.adminCheckReleases))
+
 	// Admin 트랙 동기화 — batch-backfill track lists for albums that lack them
 	mux.HandleFunc("GET /admin/tracks/status", s.requireAdmin(s.adminTracksStatus))
 	mux.HandleFunc("POST /admin/tracks/backfill", s.requireAdmin(s.adminTracksBackfill))
@@ -262,6 +266,15 @@ func (s *server) ensureAuthSchema(ctx context.Context) error {
 		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS tracks_synced_at TIMESTAMPTZ;
 		-- 트랙 한글 표시 이름: admin-curated, 동기화(백필)는 절대 덮어쓰지 않는다.
 		ALTER TABLE IF EXISTS tracks ADD COLUMN IF NOT EXISTS display_name TEXT;
+
+		-- 앨범 full object 메타 (2026-02 API 개편 후 label/popularity는 죽었고,
+		-- copyrights ℗ 문구가 레이블명이 남는 유일한 자리다). GET /albums/{id}를
+		-- 이미 호출하는 트랙 동기화·앨범 단건 추가가 공짜로 채운다.
+		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS upc TEXT;
+		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS copyrights JSONB;
+		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS release_date_precision TEXT;
+		-- 신보 체크: 아티스트별 마지막 확인 시각. NULL = 아직 한 번도 안 봄.
+		ALTER TABLE IF EXISTS artists ADD COLUMN IF NOT EXISTS releases_checked_at TIMESTAMPTZ;
 
 		ALTER TABLE IF EXISTS artists ADD COLUMN IF NOT EXISTS image_url TEXT;
 		ALTER TABLE IF EXISTS artists ADD COLUMN IF NOT EXISTS genres TEXT[];

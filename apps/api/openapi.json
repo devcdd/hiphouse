@@ -296,12 +296,13 @@
       "post": {
         "tags": ["artists"],
         "summary": "아티스트 앨범 크롤 (관리자)",
-        "description": "해당 아티스트의 전체 앨범을 Spotify에서 가져와 저장. 앨범 0개면 아티스트를 저장하지 않음. 크레딧 아티스트 중 이미지 없는 것만 개별 enrich. 트랙 미동기화 앨범(신규 포함)은 트랙까지 같이 수집.",
+        "description": "해당 아티스트의 전체 앨범을 Spotify에서 가져와 저장. 앨범 0개면 아티스트를 저장하지 않음. 크레딧 아티스트 중 이미지 없는 것만 개별 enrich. 트랙 미동기화 앨범(신규 포함)은 트랙까지 같이 수집. appears_on=true면 참여·컴필레이션 앨범(include_groups=appears_on,compilation)까지 포함 — 노이즈가 많아 기본은 꺼짐.",
         "requestBody": {
           "required": true,
           "content": { "application/json": { "schema": { "type": "object", "required": ["artist_id"], "properties": {
             "artist_id": { "type": "string" },
-            "key": { "type": "string", "enum": ["first", "second"] }
+            "key": { "type": "string", "enum": ["first", "second"] },
+            "appears_on": { "type": "boolean", "default": false, "description": "참여·컴필레이션 앨범 포함 여부" }
           } } } }
         },
         "responses": {
@@ -354,11 +355,40 @@
         }
       }
     },
+    "/admin/spotify/releases-status": {
+      "get": {
+        "tags": ["artists"],
+        "summary": "신보 체크 현황 (관리자)",
+        "description": "artists = live 앨범을 보유한 체크 대상 아티스트 수, stale = 이번 주기(20시간) 내 아직 확인하지 않은 아티스트 수.",
+        "responses": {
+          "200": { "description": "{artists, stale}", "content": { "application/json": { "schema": { "type": "object", "properties": {
+            "artists": { "type": "integer" }, "stale": { "type": "integer" }
+          } } } } }
+        }
+      }
+    },
+    "/admin/spotify/check-releases": {
+      "post": {
+        "tags": ["artists"],
+        "summary": "신보 감지 배치 실행 (관리자)",
+        "description": "DB 보유 아티스트를 오래 안 본 순서대로 최대 limit명 확인 (아티스트당 Spotify 요청 1회 — 앨범 목록 첫 페이지 10장). DB에 없는 앨범만 저장하고 enrich·트랙 동기화까지 이어서 수행. 소프트 삭제된 앨범은 되살리지 않는다. Spotify 오류 시 배치를 중단하고 진행분과 함께 error로 보고 — 실패한 아티스트는 다음 호출이 다시 집는다. remaining이 0이 될 때까지 반복 호출.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "properties": {
+            "key": { "type": "string", "enum": ["first", "second"] },
+            "limit": { "type": "integer", "default": 10, "minimum": 1, "maximum": 50, "description": "배치당 확인할 아티스트 수" }
+          } } } }
+        },
+        "responses": {
+          "200": { "description": "{checked, new_albums, enriched, tracks_synced, remaining, artists:[{id,name,albums:[이름]}], error?}" }
+        }
+      }
+    },
     "/admin/tracks/status": {
       "get": {
         "tags": ["albums"],
         "summary": "트랙 동기화 현황 (관리자)",
-        "description": "삭제되지 않은 앨범 기준. missing = 아직 트랙을 받아오지 않은 앨범 수, tracks = 저장된 전체 트랙 행 수.",
+        "description": "삭제되지 않은 앨범 기준. missing = 트랙 또는 앨범 메타(upc/copyrights/발매일 정밀도)를 아직 받아오지 않은 앨범 수, tracks = 저장된 전체 트랙 행 수.",
         "responses": {
           "200": { "description": "{albums, synced, missing, tracks}", "content": { "application/json": { "schema": { "type": "object", "properties": {
             "albums": { "type": "integer" }, "synced": { "type": "integer" },
@@ -371,7 +401,7 @@
       "post": {
         "tags": ["albums"],
         "summary": "트랙 백필 배치 실행 (관리자)",
-        "description": "트랙 미동기화 앨범을 최신 발매순으로 최대 limit개 처리 (앨범당 Spotify 요청 1회, 앨범별 커밋). 404 앨범은 빈 트랙으로 완료 처리. 그 외 Spotify 오류는 배치를 중단하고 진행분과 함께 error로 보고. remaining이 0이 될 때까지 반복 호출.",
+        "description": "트랙 미동기화 또는 앨범 메타(upc/copyrights/발매일 정밀도) 미수집 앨범을 최신 발매순으로 최대 limit개 처리 (앨범당 Spotify 요청 1회, 앨범별 커밋) — 같은 full object 응답에서 트랙과 메타를 함께 저장한다. 404 앨범은 빈 트랙으로 완료 처리. 그 외 Spotify 오류는 배치를 중단하고 진행분과 함께 error로 보고. remaining이 0이 될 때까지 반복 호출.",
         "requestBody": {
           "required": true,
           "content": { "application/json": { "schema": { "type": "object", "properties": {

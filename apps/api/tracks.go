@@ -4,6 +4,10 @@ package main
 // batch. GET /v1/albums/{id} already carries the first 50 tracks, so nearly
 // every album costs exactly one request; longer albums follow tracks.next.
 // The web admin tab calls /backfill repeatedly until `remaining` hits 0.
+//
+// 같은 full object에 실려오는 앨범 메타(upc/copyrights/release_date_precision)도
+// 여기서 같이 저장한다 — 이미 트랙이 동기화됐지만 메타가 없는 앨범(과거 수집분)도
+// 백필 대상에 들어가므로, 한 번의 요청으로 트랙 재확인과 메타 채움을 겸한다.
 
 import (
 	"context"
@@ -78,11 +82,15 @@ func (s *server) listAlbumTracks(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, tracks)
 }
 
-// GET /admin/tracks/status — 동기화 진행 현황 (live albums only).
+// GET /admin/tracks/status — 동기화 진행 현황 (live albums only). "완료"는 트랙과
+// 앨범 메타가 모두 있는 상태 — release_date_precision은 full object에 항상 실려
+// 오므로 NULL이면 아직 메타를 못 받은 앨범이다.
 func (s *server) adminTracksStatus(w http.ResponseWriter, r *http.Request) {
 	var albums, synced, tracks int
 	if err := s.db.QueryRow(r.Context(),
-		"SELECT COUNT(*)::int, COUNT(tracks_synced_at)::int FROM albums WHERE deleted_at IS NULL").
+		`SELECT COUNT(*)::int,
+		        COUNT(*) FILTER (WHERE tracks_synced_at IS NOT NULL AND release_date_precision IS NOT NULL)::int
+		 FROM albums WHERE deleted_at IS NULL`).
 		Scan(&albums, &synced); err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -134,7 +142,8 @@ func (s *server) adminTracksBackfill(w http.ResponseWriter, r *http.Request) {
 	market := env("MARKET", "KR")
 
 	rows, err := s.db.Query(r.Context(),
-		`SELECT id, name FROM albums WHERE deleted_at IS NULL AND tracks_synced_at IS NULL
+		`SELECT id, name FROM albums
+		 WHERE deleted_at IS NULL AND (tracks_synced_at IS NULL OR release_date_precision IS NULL)
 		 ORDER BY release_date DESC NULLS LAST, id LIMIT $1`, body.Limit)
 	if err != nil {
 		writeErr(w, 500, err.Error())
@@ -149,12 +158,12 @@ func (s *server) adminTracksBackfill(w http.ResponseWriter, r *http.Request) {
 
 	res := trackBackfillResult{Albums: []trackBackfillItem{}}
 	for _, al := range pending {
-		tracks, notFound, err := s.fetchAlbumTracks(r.Context(), body.Key, al.ID, market)
+		tracks, meta, notFound, err := s.fetchAlbumTracks(r.Context(), body.Key, al.ID, market)
 		if err != nil {
 			res.Error = strPtr(fmt.Sprintf("%s (%s): %v", al.Name, al.ID, err))
 			break
 		}
-		if err := s.saveAlbumTracks(r.Context(), al.ID, tracks); err != nil {
+		if err := s.saveAlbumTracks(r.Context(), al.ID, tracks, meta); err != nil {
 			res.Error = strPtr(fmt.Sprintf("%s (%s): %v", al.Name, al.ID, err))
 			break
 		}
@@ -167,7 +176,8 @@ func (s *server) adminTracksBackfill(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.db.QueryRow(r.Context(),
-		"SELECT COUNT(*)::int FROM albums WHERE deleted_at IS NULL AND tracks_synced_at IS NULL").
+		`SELECT COUNT(*)::int FROM albums
+		 WHERE deleted_at IS NULL AND (tracks_synced_at IS NULL OR release_date_precision IS NULL)`).
 		Scan(&res.Remaining); err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -175,39 +185,42 @@ func (s *server) adminTracksBackfill(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, res)
 }
 
-// fetchAlbumTracks pulls the album's full track list. notFound=true means the
-// album no longer exists on Spotify (or left the market) — caller saves it as
-// synced with no tracks instead of retrying forever.
-func (s *server) fetchAlbumTracks(ctx context.Context, key, albumID, market string) (tracks []spTrack, notFound bool, err error) {
+// fetchAlbumTracks pulls the album's full track list plus the full-object 메타
+// (upc/copyrights/precision — 같은 응답에 실려오므로 공짜). notFound=true means
+// the album no longer exists on Spotify (or left the market) — caller saves it
+// as synced with no tracks instead of retrying forever.
+func (s *server) fetchAlbumTracks(ctx context.Context, key, albumID, market string) (tracks []spTrack, meta *spAlbum, notFound bool, err error) {
 	var full struct {
+		spAlbum
 		Tracks spTrackPage `json:"tracks"`
 	}
 	u := spAPI + "/albums/" + url.PathEscape(albumID) + "?market=" + url.QueryEscape(market)
 	if err := s.spGet(ctx, key, u, &full); err != nil {
 		var se *spError
 		if errors.As(err, &se) && se.Status == 404 {
-			return nil, true, nil
+			return nil, nil, true, nil
 		}
-		return nil, false, err
+		return nil, nil, false, err
 	}
 	tracks = full.Tracks.Items
 	// >50 tracks is rare, but page through the rest when it happens.
 	for next := full.Tracks.Next; next != nil && *next != ""; {
 		var page spTrackPage
 		if err := s.spGet(ctx, key, *next, &page); err != nil {
-			return nil, false, err
+			return nil, nil, false, err
 		}
 		tracks = append(tracks, page.Items...)
 		next = page.Next
 	}
-	return tracks, false, nil
+	return tracks, &full.spAlbum, false, nil
 }
 
-// saveAlbumTracks rewrites the album's tracks and stamps tracks_synced_at in
+// saveAlbumTracks rewrites the album's tracks, 앨범 메타, and tracks_synced_at in
 // one tx — an album is either fully synced or untouched. Existing rows are
 // upserted (not delete-all'd) so the admin-curated display_name survives a
-// re-sync; only tracks gone from Spotify are dropped.
-func (s *server) saveAlbumTracks(ctx context.Context, albumID string, tracks []spTrack) error {
+// re-sync; only tracks gone from Spotify are dropped. meta nil = 404였던 앨범;
+// precision에 'unknown'을 채워 메타 백필 대상에서 빠지게 한다 (재시도 무의미).
+func (s *server) saveAlbumTracks(ctx context.Context, albumID string, tracks []spTrack, meta *spAlbum) error {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return err
@@ -245,7 +258,22 @@ func (s *server) saveAlbumTracks(ctx context.Context, albumID string, tracks []s
 			return err
 		}
 	}
-	if _, err := tx.Exec(ctx, "UPDATE albums SET tracks_synced_at=now() WHERE id=$1", albumID); err != nil {
+	if meta != nil {
+		// COALESCE($n, …, 'unknown'): full object인데도 필드가 빈 앨범이 영원히
+		// 백필 후보로 남지 않게 precision만은 반드시 채운다.
+		if _, err := tx.Exec(ctx,
+			`UPDATE albums SET tracks_synced_at=now(),
+			   upc=COALESCE($2, upc), copyrights=COALESCE($3, copyrights),
+			   release_date_precision=COALESCE($4, release_date_precision, 'unknown')
+			 WHERE id=$1`,
+			albumID, strPtr(meta.ExternalIDs.UPC), copyrightsJSON(meta.Copyrights),
+			strPtr(meta.ReleaseDatePrecision)); err != nil {
+			return err
+		}
+	} else if _, err := tx.Exec(ctx,
+		`UPDATE albums SET tracks_synced_at=now(),
+		   release_date_precision=COALESCE(release_date_precision, 'unknown')
+		 WHERE id=$1`, albumID); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
