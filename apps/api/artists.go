@@ -25,11 +25,14 @@ type Artist struct {
 	// Spotify follower count, crawler/enrich-owned; null until first enriched.
 	// Kept for the admin refresh flow — the UI shows FollowerCount instead.
 	Followers *int `json:"followers" db:"followers"`
+	// 신보 감시 대상 여부 — 신보 체크가 이 플래그 켜진 아티스트만 본다. 관리자
+	// 토글 소유(크롤러는 안 건드림); 마이그레이션이 대표 크레딧 앨범 수로 시드.
+	ReleasesWatch bool `json:"releases_watch" db:"releases_watch"`
 	// 서비스 내부 팔로워 수 — follows 집계. Read-only output column.
 	FollowerCount int `json:"follower_count" db:"follower_count"`
 }
 
-const artistCols = "id,name,display_name,image_url,genres,spotify_url,aliases,followers"
+const artistCols = "id,name,display_name,image_url,genres,spotify_url,aliases,followers,releases_watch"
 
 // artistSelectCols is artistCols plus the computed follower count; every artist
 // read uses it, while artistCols alone stays valid as an INSERT column list.
@@ -94,8 +97,8 @@ func (s *server) createArtist(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "id is required")
 		return
 	}
-	_, err := s.db.Exec(r.Context(), "INSERT INTO artists("+artistCols+") VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
-		a.ID, a.Name, nilIfBlank(a.DisplayName), a.ImageURL, a.Genres, a.SpotifyURL, normalizeAliases(a.Aliases), a.Followers)
+	_, err := s.db.Exec(r.Context(), "INSERT INTO artists("+artistCols+") VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+		a.ID, a.Name, nilIfBlank(a.DisplayName), a.ImageURL, a.Genres, a.SpotifyURL, normalizeAliases(a.Aliases), a.Followers, a.ReleasesWatch)
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		writeErr(w, 409, "artist id already exists")
@@ -151,6 +154,28 @@ func (s *server) updateArtistDisplayName(w http.ResponseWriter, r *http.Request)
 	}
 	tag, err := s.db.Exec(r.Context(), "UPDATE artists SET display_name=$2 WHERE id=$1",
 		r.PathValue("id"), nilIfBlank(body.DisplayName))
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		writeErr(w, 404, "artist not found")
+		return
+	}
+	w.WriteHeader(204)
+}
+
+// updateArtistReleasesWatch flips only the 신보 감시 플래그 (admin-only) — same
+// partial-update shape as updateArtistDisplayName; 크롤러·동기화는 안 건드린다.
+func (s *server) updateArtistReleasesWatch(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Watch bool `json:"watch"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	tag, err := s.db.Exec(r.Context(), "UPDATE artists SET releases_watch=$2 WHERE id=$1",
+		r.PathValue("id"), body.Watch)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return

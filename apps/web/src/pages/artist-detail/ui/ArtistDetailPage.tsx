@@ -5,6 +5,7 @@ import { AlbumFeed } from '@/widgets/album-feed'
 import { FollowButton } from '@/features/follow-artist'
 import { RefreshAlbumsButton } from '@/features/crawl-artist'
 import { EditDisplayNameButton } from '@/features/edit-display-name'
+import { WatchReleasesButton } from '@/features/watch-releases'
 import { Avatar } from '@/shared/ui/Avatar'
 import { displayName } from '@/shared/lib/displayName'
 import styles from './ArtistDetailPage.module.css'
@@ -43,6 +44,7 @@ export function ArtistDetailPage() {
             name={artist.name ?? artist.id}
             displayName={artist.display_name}
           />
+          <WatchReleasesButton artistId={artist.id} watching={artist.releases_watch} />
         </div>
       )}
 
