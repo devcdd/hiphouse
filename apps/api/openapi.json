@@ -297,6 +297,35 @@
         }
       }
     },
+    "/admin/spotify/releases-status": {
+      "get": {
+        "tags": ["artists"],
+        "summary": "신보 체크 현황 (관리자)",
+        "description": "artists = live 앨범을 보유한 체크 대상 아티스트 수, stale = 이번 주기(20시간) 내 아직 확인하지 않은 아티스트 수.",
+        "responses": {
+          "200": { "description": "{artists, stale}", "content": { "application/json": { "schema": { "type": "object", "properties": {
+            "artists": { "type": "integer" }, "stale": { "type": "integer" }
+          } } } } }
+        }
+      }
+    },
+    "/admin/spotify/check-releases": {
+      "post": {
+        "tags": ["artists"],
+        "summary": "신보 감지 배치 실행 (관리자)",
+        "description": "DB 보유 아티스트를 오래 안 본 순서대로 최대 limit명 확인 (아티스트당 Spotify 요청 1회 — 앨범 목록 첫 페이지 10장). DB에 없는 앨범만 저장하고 enrich·트랙 동기화까지 이어서 수행. 소프트 삭제된 앨범은 되살리지 않는다. Spotify 오류 시 배치를 중단하고 진행분과 함께 error로 보고 — 실패한 아티스트는 다음 호출이 다시 집는다. remaining이 0이 될 때까지 반복 호출.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "properties": {
+            "key": { "type": "string", "enum": ["first", "second"] },
+            "limit": { "type": "integer", "default": 10, "minimum": 1, "maximum": 50, "description": "배치당 확인할 아티스트 수" }
+          } } } }
+        },
+        "responses": {
+          "200": { "description": "{checked, new_albums, enriched, tracks_synced, remaining, artists:[{id,name,albums:[이름]}], error?}" }
+        }
+      }
+    },
     "/admin/tracks/status": {
       "get": {
         "tags": ["albums"],
