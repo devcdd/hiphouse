@@ -75,6 +75,9 @@ func main() {
 	mux.HandleFunc("GET /users/{id}", s.getPublicUser)
 	mux.HandleFunc("GET /users/{id}/ratings", s.listPublicRatedAlbums)
 
+	// 링크 스크래퍼용 메타 프리렌더 (nginx가 봇 UA만 여기로 넘긴다)
+	mux.HandleFunc("GET /og/albums/{id}", s.ogAlbum)
+
 	// Favorites (auth required)
 	mux.HandleFunc("GET /favorites", s.requireAuth(s.listFavorites))
 	mux.HandleFunc("POST /favorites", s.requireAuth(s.addFavorite))

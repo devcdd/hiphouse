@@ -6,6 +6,15 @@
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>힙집 HipHouse</title>
+    <!-- 앨범 상세는 nginx가 스크래퍼 UA만 API 프리렌더(/og/albums/{id})로 넘겨 앨범별
+         카드를 준다. 여기 기본값은 그 외 경로(루트·검색·프로필)가 공유될 때 쓰인다. -->
+    <meta name="description" content="년도별로 골라 보는 힙합 앨범. 평가하고, 즐겨찾기하고, 취향을 나눠보세요." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="힙집" />
+    <meta property="og:title" content="힙집 HipHouse" />
+    <meta property="og:description" content="년도별로 골라 보는 힙합 앨범. 평가하고, 즐겨찾기하고, 취향을 나눠보세요." />
+    <meta property="og:image" content="/apple-touch-icon.png" />
+    <meta name="twitter:card" content="summary" />
     <script>
       // Apply saved theme before paint to avoid a flash.
       try {

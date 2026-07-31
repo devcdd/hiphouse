@@ -187,6 +187,18 @@
         }
       }
     },
+    "/og/albums/{id}": {
+      "get": {
+        "tags": ["albums"],
+        "summary": "링크 스크래퍼용 메타 프리렌더 (HTML)",
+        "description": "og:/twitter: 메타만 담은 HTML을 반환한다. nginx가 스크래퍼 User-Agent의 /albums/{id} 요청만 여기로 넘기고 사람은 SPA를 받는다. og:url·canonical은 PUBLIC_ORIGIN(없으면 X-Forwarded-Proto/Host)으로 만든다. 삭제되었거나 없는 앨범은 404.",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "메타 태그 HTML", "content": { "text/html": { "schema": { "type": "string" } } } },
+          "404": { "description": "없거나 삭제된 앨범" }
+        }
+      }
+    },
     "/artists": {
       "get": {
         "tags": ["artists"],
