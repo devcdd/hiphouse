@@ -253,6 +253,50 @@
         }
       }
     },
+    "/admin/spotify/albums": {
+      "get": {
+        "tags": ["albums"],
+        "summary": "Spotify 앨범 검색 (관리자 크롤링용)",
+        "description": "앨범명으로 Spotify를 검색해 후보를 반환. 장르 필터가 없으므로 관리자가 직접 골라 담는 용도. in_db는 우리 DB에 이미 있는지, deleted는 그 행이 소프트 삭제 상태인지를 뜻한다.",
+        "parameters": [
+          { "name": "q", "in": "query", "required": true, "schema": { "type": "string" }, "description": "앨범명. Spotify 쿼리 문법(artist:, year:) 사용 가능." },
+          { "name": "key", "in": "query", "schema": { "type": "string", "enum": ["first", "second"] } }
+        ],
+        "responses": {
+          "200": {
+            "description": "후보 배열",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "type": "object", "properties": {
+              "id": { "type": "string" }, "name": { "type": "string" },
+              "image_url": { "type": "string", "nullable": true },
+              "release_date": { "type": "string", "nullable": true },
+              "album_type": { "type": "string", "nullable": true },
+              "total_tracks": { "type": "integer" },
+              "artists": { "type": "string", "description": "크레딧 아티스트명 쉼표 연결" },
+              "in_db": { "type": "boolean" }, "deleted": { "type": "boolean" }
+            } } } } }
+          },
+          "502": { "description": "Spotify API 오류", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/admin/spotify/crawl-album": {
+      "post": {
+        "tags": ["albums"],
+        "summary": "앨범 단건 추가 (관리자)",
+        "description": "앨범 검색에서 고른 앨범 1개를 저장. 저장 경로는 아티스트 크롤과 동일(앨범 행 + 크레딧 아티스트 + 조인 행, 이후 enrich·트랙 동기화). 소프트 삭제된 앨범의 deleted_at은 건드리지 않으며 그 경우 응답 deleted가 true다.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "required": ["album_id"], "properties": {
+            "album_id": { "type": "string" },
+            "key": { "type": "string", "enum": ["first", "second"] }
+          } } } }
+        },
+        "responses": {
+          "200": { "description": "추가 결과 {album_id, album_name, saved, artists, enriched, tracks_synced, deleted}" },
+          "502": { "description": "Spotify API 오류", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
     "/admin/tracks/status": {
       "get": {
         "tags": ["albums"],

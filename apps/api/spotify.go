@@ -304,6 +304,108 @@ func (s *server) adminSpotifySearch(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, out)
 }
 
+// upsertAlbums writes each album row and rewrites its credited-artist join rows,
+// returning every credited artist ID. Shared by the artist crawl and the
+// album-search add so both store exactly the same shape.
+func upsertAlbums(ctx context.Context, tx pgx.Tx, albums []spAlbum) (map[string]bool, error) {
+	credited := map[string]bool{}
+	for _, al := range albums {
+		var img *string
+		if len(al.Images) > 0 {
+			img = strPtr(al.Images[0].URL)
+		}
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO albums(id,name,release_date,year,album_type,total_tracks,image_url,spotify_url)
+			 VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+			 ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name, release_date=EXCLUDED.release_date,
+			   year=EXCLUDED.year, album_type=EXCLUDED.album_type, total_tracks=EXCLUDED.total_tracks,
+			   image_url=EXCLUDED.image_url, spotify_url=EXCLUDED.spotify_url`,
+			al.ID, al.Name, strPtr(al.ReleaseDate), yearOf(al.ReleaseDate), strPtr(al.AlbumType),
+			al.TotalTracks, img, strPtr(al.ExternalURLs.Spotify)); err != nil {
+			return nil, err
+		}
+		if _, err := tx.Exec(ctx, "DELETE FROM album_artists WHERE album_id=$1", al.ID); err != nil {
+			return nil, err
+		}
+		for i, ar := range al.Artists {
+			if ar.ID == "" {
+				continue
+			}
+			credited[ar.ID] = true
+			if _, err := tx.Exec(ctx,
+				"INSERT INTO artists(id,name) VALUES($1,$2) ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name",
+				ar.ID, strPtr(ar.Name)); err != nil {
+				return nil, err
+			}
+			if _, err := tx.Exec(ctx,
+				"INSERT INTO album_artists(album_id,artist_id,position) VALUES($1,$2,$3) ON CONFLICT(album_id,artist_id) DO UPDATE SET position=EXCLUDED.position",
+				al.ID, ar.ID, i); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return credited, nil
+}
+
+// enrichCredited fills name/image/genres/followers for credited artists that are
+// still missing an image or follower count — one request each (the batch
+// /artists endpoint 403s for dev-mode apps). Best-effort: failures are skipped
+// and a later enrich run picks them up.
+func (s *server) enrichCredited(ctx context.Context, key string, credited map[string]bool) int {
+	ids := make([]string, 0, len(credited))
+	for id := range credited {
+		ids = append(ids, id)
+	}
+	var missing []string
+	rows, err := s.db.Query(ctx,
+		"SELECT id FROM artists WHERE id = ANY($1) AND (image_url IS NULL OR followers IS NULL)", ids)
+	if err == nil {
+		missing, _ = pgx.CollectRows(rows, pgx.RowTo[string])
+	}
+	enriched := 0
+	for _, id := range missing {
+		var a spArtistFull
+		if err := s.spGet(ctx, key, spAPI+"/artists/"+url.PathEscape(id), &a); err != nil {
+			continue
+		}
+		var img *string
+		if len(a.Images) > 0 {
+			img = strPtr(a.Images[0].URL)
+		}
+		if _, err := s.db.Exec(ctx,
+			`UPDATE artists SET name=COALESCE($2,name), image_url=COALESCE($3,image_url),
+			   genres=COALESCE($4,genres), spotify_url=COALESCE($5,spotify_url), followers=$6 WHERE id=$1`,
+			id, strPtr(a.Name), img, a.Genres, strPtr(a.ExternalURLs.Spotify), a.Followers.Total); err == nil {
+			enriched++
+		}
+	}
+	return enriched
+}
+
+// syncNewAlbumTracks pulls tracks for albums never track-synced (i.e. the newly
+// added ones) so a fresh add arrives complete; re-adding an existing album costs
+// nothing extra. Best-effort like enrich: a failed album keeps tracks_synced_at
+// NULL and the 트랙 동기화 backfill catches it later.
+func (s *server) syncNewAlbumTracks(ctx context.Context, key, market string, albumIDs []string) int {
+	var unsynced []string
+	rows, err := s.db.Query(ctx,
+		"SELECT id FROM albums WHERE id = ANY($1) AND deleted_at IS NULL AND tracks_synced_at IS NULL", albumIDs)
+	if err == nil {
+		unsynced, _ = pgx.CollectRows(rows, pgx.RowTo[string])
+	}
+	synced := 0
+	for _, id := range unsynced {
+		tracks, _, err := s.fetchAlbumTracks(ctx, key, id, market)
+		if err != nil {
+			continue
+		}
+		if err := s.saveAlbumTracks(ctx, id, tracks); err == nil {
+			synced++
+		}
+	}
+	return synced
+}
+
 // POST /admin/spotify/crawl {artist_id, key} — pull every album of the artist
 // into the DB (same rules as the crawler: 0 albums → artist not saved; every
 // credited artist gets a row + join credits; missing images get enriched).
@@ -353,105 +455,24 @@ func (s *server) adminSpotifyCrawl(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 
-	credited := map[string]bool{}
-	for _, al := range albums {
-		var img *string
-		if len(al.Images) > 0 {
-			img = strPtr(al.Images[0].URL)
-		}
-		if _, err := tx.Exec(r.Context(),
-			`INSERT INTO albums(id,name,release_date,year,album_type,total_tracks,image_url,spotify_url)
-			 VALUES($1,$2,$3,$4,$5,$6,$7,$8)
-			 ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name, release_date=EXCLUDED.release_date,
-			   year=EXCLUDED.year, album_type=EXCLUDED.album_type, total_tracks=EXCLUDED.total_tracks,
-			   image_url=EXCLUDED.image_url, spotify_url=EXCLUDED.spotify_url`,
-			al.ID, al.Name, strPtr(al.ReleaseDate), yearOf(al.ReleaseDate), strPtr(al.AlbumType),
-			al.TotalTracks, img, strPtr(al.ExternalURLs.Spotify)); err != nil {
-			writeErr(w, 500, err.Error())
-			return
-		}
-		if _, err := tx.Exec(r.Context(), "DELETE FROM album_artists WHERE album_id=$1", al.ID); err != nil {
-			writeErr(w, 500, err.Error())
-			return
-		}
-		for i, ar := range al.Artists {
-			if ar.ID == "" {
-				continue
-			}
-			credited[ar.ID] = true
-			if _, err := tx.Exec(r.Context(),
-				"INSERT INTO artists(id,name) VALUES($1,$2) ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name",
-				ar.ID, strPtr(ar.Name)); err != nil {
-				writeErr(w, 500, err.Error())
-				return
-			}
-			if _, err := tx.Exec(r.Context(),
-				"INSERT INTO album_artists(album_id,artist_id,position) VALUES($1,$2,$3) ON CONFLICT(album_id,artist_id) DO UPDATE SET position=EXCLUDED.position",
-				al.ID, ar.ID, i); err != nil {
-				writeErr(w, 500, err.Error())
-				return
-			}
-		}
+	list := make([]spAlbum, 0, len(albums))
+	albumIDs := make([]string, 0, len(albums))
+	for id, al := range albums {
+		list = append(list, al)
+		albumIDs = append(albumIDs, id)
+	}
+	credited, err := upsertAlbums(r.Context(), tx, list)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
 	}
 	if err := tx.Commit(r.Context()); err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
 
-	// Enrich only credited artists still missing an image or follower count —
-	// one request each (the batch /artists endpoint 403s for dev-mode apps).
-	ids := make([]string, 0, len(credited))
-	for id := range credited {
-		ids = append(ids, id)
-	}
-	var missing []string
-	rows, err := s.db.Query(r.Context(),
-		"SELECT id FROM artists WHERE id = ANY($1) AND (image_url IS NULL OR followers IS NULL)", ids)
-	if err == nil {
-		missing, _ = pgx.CollectRows(rows, pgx.RowTo[string])
-	}
-	enriched := 0
-	for _, id := range missing {
-		var a spArtistFull
-		if err := s.spGet(r.Context(), body.Key, spAPI+"/artists/"+url.PathEscape(id), &a); err != nil {
-			continue // skip quietly; a later enrich run can fill it
-		}
-		var img *string
-		if len(a.Images) > 0 {
-			img = strPtr(a.Images[0].URL)
-		}
-		if _, err := s.db.Exec(r.Context(),
-			`UPDATE artists SET name=COALESCE($2,name), image_url=COALESCE($3,image_url),
-			   genres=COALESCE($4,genres), spotify_url=COALESCE($5,spotify_url), followers=$6 WHERE id=$1`,
-			id, strPtr(a.Name), img, a.Genres, strPtr(a.ExternalURLs.Spotify), a.Followers.Total); err == nil {
-			enriched++
-		}
-	}
-
-	// Albums never track-synced (i.e. the newly added ones) get their tracks in
-	// the same run, so a fresh crawl arrives complete; re-crawling an existing
-	// artist costs nothing extra. Best-effort like enrich: a failed album keeps
-	// tracks_synced_at NULL and the 트랙 동기화 backfill catches it later.
-	tracksSynced := 0
-	albumIDs := make([]string, 0, len(albums))
-	for id := range albums {
-		albumIDs = append(albumIDs, id)
-	}
-	var unsynced []string
-	rows, err = s.db.Query(r.Context(),
-		"SELECT id FROM albums WHERE id = ANY($1) AND deleted_at IS NULL AND tracks_synced_at IS NULL", albumIDs)
-	if err == nil {
-		unsynced, _ = pgx.CollectRows(rows, pgx.RowTo[string])
-	}
-	for _, id := range unsynced {
-		tracks, _, err := s.fetchAlbumTracks(r.Context(), body.Key, id, market)
-		if err != nil {
-			continue
-		}
-		if err := s.saveAlbumTracks(r.Context(), id, tracks); err == nil {
-			tracksSynced++
-		}
-	}
+	enriched := s.enrichCredited(r.Context(), body.Key, credited)
+	tracksSynced := s.syncNewAlbumTracks(r.Context(), body.Key, market, albumIDs)
 
 	var name *string
 	_ = s.db.QueryRow(r.Context(), "SELECT name FROM artists WHERE id=$1", body.ArtistID).Scan(&name)
@@ -462,5 +483,146 @@ func (s *server) adminSpotifyCrawl(w http.ResponseWriter, r *http.Request) {
 		"artists":       len(credited),
 		"enriched":      enriched,
 		"tracks_synced": tracksSynced,
+	})
+}
+
+// GET /admin/spotify/albums?q=&key= — Spotify album candidates for a title
+// search, flagged with whether we already hold them. Album search has no genre
+// filter (Spotify exposes none at album level), so this is a pick-by-hand list:
+// the admin curates, exactly like artists.txt does for the artist crawl.
+func (s *server) adminSpotifyAlbumSearch(w http.ResponseWriter, r *http.Request) {
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if q == "" {
+		writeErr(w, 400, "q is required")
+		return
+	}
+	key := r.URL.Query().Get("key")
+	market := env("MARKET", "KR")
+
+	var res struct {
+		Albums struct {
+			Items []spAlbum `json:"items"`
+		} `json:"albums"`
+	}
+	u := spAPI + "/search?type=album&limit=20&market=" + url.QueryEscape(market) + "&q=" + url.QueryEscape(q)
+	if err := s.spGet(r.Context(), key, u, &res); err != nil {
+		writeErr(w, 502, err.Error())
+		return
+	}
+
+	ids := make([]string, 0, len(res.Albums.Items))
+	for _, al := range res.Albums.Items {
+		ids = append(ids, al.ID)
+	}
+	// deleted albums are still rows — say so, otherwise adding one looks like a
+	// no-op in the feed (the add path deliberately never clears deleted_at).
+	deleted := map[string]bool{}
+	if len(ids) > 0 {
+		rows, err := s.db.Query(r.Context(),
+			"SELECT id, deleted_at IS NOT NULL FROM albums WHERE id = ANY($1)", ids)
+		if err != nil {
+			writeErr(w, 500, err.Error())
+			return
+		}
+		for rows.Next() {
+			var id string
+			var del bool
+			if err := rows.Scan(&id, &del); err != nil {
+				rows.Close()
+				writeErr(w, 500, err.Error())
+				return
+			}
+			deleted[id] = del
+		}
+		rows.Close()
+	}
+
+	type hit struct {
+		ID          string  `json:"id"`
+		Name        string  `json:"name"`
+		ImageURL    *string `json:"image_url"`
+		ReleaseDate *string `json:"release_date"`
+		AlbumType   *string `json:"album_type"`
+		TotalTracks int     `json:"total_tracks"`
+		Artists     string  `json:"artists"`
+		InDB        bool    `json:"in_db"`
+		Deleted     bool    `json:"deleted"`
+	}
+	out := make([]hit, 0, len(res.Albums.Items))
+	for _, al := range res.Albums.Items {
+		names := make([]string, 0, len(al.Artists))
+		for _, ar := range al.Artists {
+			names = append(names, ar.Name)
+		}
+		del, inDB := deleted[al.ID]
+		out = append(out, hit{
+			ID: al.ID, Name: al.Name, ImageURL: nil,
+			ReleaseDate: strPtr(al.ReleaseDate), AlbumType: strPtr(al.AlbumType),
+			TotalTracks: al.TotalTracks, Artists: strings.Join(names, ", "),
+			InDB: inDB, Deleted: del,
+		})
+		if len(al.Images) > 0 {
+			out[len(out)-1].ImageURL = strPtr(al.Images[0].URL)
+		}
+	}
+	writeJSON(w, 200, out)
+}
+
+// POST /admin/spotify/crawl-album {album_id, key} — add one album picked from
+// the album search. Same storage path as the artist crawl (album row + credited
+// artists + join rows, then enrich and track-sync), just scoped to one album.
+func (s *server) adminSpotifyCrawlAlbum(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		AlbumID string `json:"album_id"`
+		Key     string `json:"key"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	if body.AlbumID == "" {
+		writeErr(w, 400, "album_id is required")
+		return
+	}
+	market := env("MARKET", "KR")
+
+	// Refetch by ID rather than trusting the search payload: same shape, one
+	// request, and the stored row can't go stale against what the admin saw.
+	var al spAlbum
+	u := spAPI + "/albums/" + url.PathEscape(body.AlbumID) + "?market=" + url.QueryEscape(market)
+	if err := s.spGet(r.Context(), body.Key, u, &al); err != nil {
+		writeErr(w, 502, err.Error())
+		return
+	}
+
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	credited, err := upsertAlbums(r.Context(), tx, []spAlbum{al})
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+
+	enriched := s.enrichCredited(r.Context(), body.Key, credited)
+	tracksSynced := s.syncNewAlbumTracks(r.Context(), body.Key, market, []string{al.ID})
+
+	var deleted bool
+	_ = s.db.QueryRow(r.Context(), "SELECT deleted_at IS NOT NULL FROM albums WHERE id=$1", al.ID).Scan(&deleted)
+	writeJSON(w, 200, map[string]any{
+		"album_id":      al.ID,
+		"album_name":    al.Name,
+		"saved":         true,
+		"artists":       len(credited),
+		"enriched":      enriched,
+		"tracks_synced": tracksSynced,
+		"deleted":       deleted, // true = row exists but is soft-deleted; restore it in 삭제된 앨범 탭
 	})
 }
