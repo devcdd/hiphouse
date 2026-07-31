@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -110,6 +113,26 @@ func orderClause(sort string) string {
 	}
 }
 
+// likeEscape neutralizes LIKE wildcards in user input so they match literally.
+var likeEscape = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+
+// searchMatch picks the SQL operator + bind value for a user search query.
+// Plain infix ILIKE let short Latin queries match inside words — "ander" pulled
+// in "wandering", "Neanderthal" and the alias "Kim Ximya X D. Sanders" — so
+// ASCII queries anchor at word starts instead (~* '\m…', case-insensitive;
+// hyphens/spaces count as word breaks, so "dragon" still finds "G-DRAGON").
+// Anything with a non-ASCII rune keeps infix: 한글 이름에는 단어 경계가 없어서
+// ("심야" ← "김심야") 접두 매칭으로는 찾을 수 없다. A query starting with a
+// non-word rune (".paak") also keeps infix — \m never matches before it.
+func searchMatch(q string) (op, val string) {
+	first, _ := utf8.DecodeRuneInString(q)
+	ascii := !strings.ContainsFunc(q, func(r rune) bool { return r > unicode.MaxASCII })
+	if !ascii || !(first == '_' || unicode.IsLetter(first) || unicode.IsDigit(first)) {
+		return " ILIKE ", "%" + likeEscape.Replace(q) + "%"
+	}
+	return " ~* ", `\m` + regexp.QuoteMeta(q)
+}
+
 // buildAlbumListQuery is pure so it can be unit-tested without a DB.
 // deleted selects soft-delete visibility: "hide" (public), "include" (admin
 // browsing — deleted rows mixed in, dimmed client-side), "only" (admin 삭제 목록).
@@ -142,14 +165,15 @@ func buildAlbumListQuery(year *int, artistID, q string, types []string, sort str
 	// so "블랙넛" finds albums stored under "Black Nut" — or a track name (원본명
 	// 또는 한글 표시 이름), so searching a song title surfaces its album.
 	if q != "" {
-		args = append(args, "%"+q+"%")
+		op, val := searchMatch(q)
+		args = append(args, val)
 		p := "$" + strconv.Itoa(len(args))
-		sql += " AND (albums.name ILIKE " + p + " OR albums.display_name ILIKE " + p +
+		sql += " AND (albums.name" + op + p + " OR albums.display_name" + op + p +
 			" OR EXISTS (SELECT 1 FROM album_artists aa JOIN artists ar ON ar.id = aa.artist_id" +
-			" WHERE aa.album_id = albums.id AND (ar.name ILIKE " + p + " OR ar.display_name ILIKE " + p +
-			" OR EXISTS (SELECT 1 FROM unnest(COALESCE(ar.aliases,'{}'::text[])) AS al WHERE al ILIKE " + p + ")))" +
-			" OR EXISTS (SELECT 1 FROM tracks t WHERE t.album_id = albums.id AND (t.name ILIKE " + p +
-			" OR t.display_name ILIKE " + p + ")))"
+			" WHERE aa.album_id = albums.id AND (ar.name" + op + p + " OR ar.display_name" + op + p +
+			" OR EXISTS (SELECT 1 FROM unnest(COALESCE(ar.aliases,'{}'::text[])) AS al WHERE al" + op + p + ")))" +
+			" OR EXISTS (SELECT 1 FROM tracks t WHERE t.album_id = albums.id AND (t.name" + op + p +
+			" OR t.display_name" + op + p + ")))"
 	}
 	// Multi-select album types combine with OR. Empty = no filter (전체).
 	var conds []string
