@@ -240,6 +240,17 @@
   cursor: pointer;
 }
 
+/* 크롤 옵션 등 체크박스 + 짧은 라벨 한 줄 */
+.checkLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
 /* --- 트랙 동기화 --- */
 
 .runNote {

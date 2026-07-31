@@ -439,13 +439,16 @@ func (s *server) syncNewAlbumTracks(ctx context.Context, key, market string, alb
 	return synced
 }
 
-// POST /admin/spotify/crawl {artist_id, key} — pull every album of the artist
-// into the DB (same rules as the crawler: 0 albums → artist not saved; every
-// credited artist gets a row + join credits; missing images get enriched).
+// POST /admin/spotify/crawl {artist_id, key, appears_on} — pull every album of
+// the artist into the DB (same rules as the crawler: 0 albums → artist not
+// saved; every credited artist gets a row + join credits; missing images get
+// enriched). appears_on=true widens include_groups to 참여·컴필레이션 앨범
+// (쇼미더머니류) — noisy, so it's an explicit admin toggle, never the default.
 func (s *server) adminSpotifyCrawl(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		ArtistID string `json:"artist_id"`
-		Key      string `json:"key"`
+		ArtistID  string `json:"artist_id"`
+		Key       string `json:"key"`
+		AppearsOn bool   `json:"appears_on"`
 	}
 	if !decode(w, r, &body) {
 		return
@@ -455,10 +458,14 @@ func (s *server) adminSpotifyCrawl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	market := env("MARKET", "KR")
+	groups := "album,single"
+	if body.AppearsOn {
+		groups += ",appears_on,compilation"
+	}
 
 	// Page through the artist's albums (limit is capped at ~10 for client-credentials apps).
 	albums := map[string]spAlbum{}
-	next := spAPI + "/artists/" + url.PathEscape(body.ArtistID) + "/albums?include_groups=album,single&market=" + url.QueryEscape(market) + "&limit=10"
+	next := spAPI + "/artists/" + url.PathEscape(body.ArtistID) + "/albums?include_groups=" + url.QueryEscape(groups) + "&market=" + url.QueryEscape(market) + "&limit=10"
 	for next != "" {
 		var page struct {
 			Items []spAlbum `json:"items"`

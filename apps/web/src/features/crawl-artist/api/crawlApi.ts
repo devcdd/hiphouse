@@ -20,8 +20,9 @@ export interface CrawlResult {
 
 // Admin: pull an artist's Spotify discography into the DB.
 // key '' = the server's default credentials pair.
-export function crawlArtist(artistId: string, key = ''): Promise<CrawlResult> {
-  return apiPost<CrawlResult>('/admin/spotify/crawl', { artist_id: artistId, key })
+// appearsOn=true면 참여·컴필레이션 앨범(쇼미더머니류)까지 포함 — 노이즈가 많아 기본은 꺼짐.
+export function crawlArtist(artistId: string, key = '', appearsOn = false): Promise<CrawlResult> {
+  return apiPost<CrawlResult>('/admin/spotify/crawl', { artist_id: artistId, key, appears_on: appearsOn })
 }
 
 export interface CrawlAlbumResult {

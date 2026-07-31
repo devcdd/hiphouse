@@ -26,6 +26,9 @@ export function CrawlTab() {
   const [input, setInput] = useState('')
   const q = useDebouncedValue(input.trim(), 350)
   const [message, setMessage] = useState('')
+  // 참여·컴필레이션 앨범(include_groups=appears_on,compilation)까지 수집할지.
+  // 쇼미더머니류를 담을 때만 켜는 명시적 토글 — 노이즈가 많아 기본은 꺼짐.
+  const [appearsOn, setAppearsOn] = useState(false)
 
   const artistSearch = useQuery({
     queryKey: ['spotify-search', q, key],
@@ -49,7 +52,7 @@ export function CrawlTab() {
   }
 
   const crawl = useMutation({
-    mutationFn: (artistId: string) => crawlArtist(artistId, key),
+    mutationFn: (artistId: string) => crawlArtist(artistId, key, appearsOn),
     onSuccess: (res) => {
       setMessage(
         res.saved
@@ -128,6 +131,19 @@ export function CrawlTab() {
             </button>
           )}
         </div>
+
+        {mode === 'artist' && (
+          <label className={styles.checkLabel}>
+            <input
+              type="checkbox"
+              className={styles.check}
+              checked={appearsOn}
+              onChange={(e) => setAppearsOn(e.target.checked)}
+              disabled={pending}
+            />
+            참여·컴필레이션 앨범 포함
+          </label>
+        )}
       </div>
 
       {message && <p className={styles.crawlMsg}>{message}</p>}

@@ -239,12 +239,13 @@
       "post": {
         "tags": ["artists"],
         "summary": "아티스트 앨범 크롤 (관리자)",
-        "description": "해당 아티스트의 전체 앨범을 Spotify에서 가져와 저장. 앨범 0개면 아티스트를 저장하지 않음. 크레딧 아티스트 중 이미지 없는 것만 개별 enrich. 트랙 미동기화 앨범(신규 포함)은 트랙까지 같이 수집.",
+        "description": "해당 아티스트의 전체 앨범을 Spotify에서 가져와 저장. 앨범 0개면 아티스트를 저장하지 않음. 크레딧 아티스트 중 이미지 없는 것만 개별 enrich. 트랙 미동기화 앨범(신규 포함)은 트랙까지 같이 수집. appears_on=true면 참여·컴필레이션 앨범(include_groups=appears_on,compilation)까지 포함 — 노이즈가 많아 기본은 꺼짐.",
         "requestBody": {
           "required": true,
           "content": { "application/json": { "schema": { "type": "object", "required": ["artist_id"], "properties": {
             "artist_id": { "type": "string" },
-            "key": { "type": "string", "enum": ["first", "second"] }
+            "key": { "type": "string", "enum": ["first", "second"] },
+            "appears_on": { "type": "boolean", "default": false, "description": "참여·컴필레이션 앨범 포함 여부" }
           } } } }
         },
         "responses": {
