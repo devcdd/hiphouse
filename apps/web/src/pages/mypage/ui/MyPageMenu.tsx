@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ChevronRight, Pencil, Star, Heart, UserPlus } from 'lucide-react'
+import { ChevronRight, Pencil, Star, Heart, UserPlus, UserRound } from 'lucide-react'
 import { useAuth } from '@/entities/session'
 import { AuthGate } from './AuthGate'
 import styles from './MyPage.module.css'
@@ -22,11 +22,15 @@ export function MyPageMenu() {
 
 function Menu() {
   const { user } = useAuth()
+  // 공개 프로필만 user.id가 필요해 ITEMS 상수에 넣지 못한다.
+  const items = user
+    ? [{ to: `/users/${encodeURIComponent(user.id)}`, label: '내 공개 프로필', Icon: UserRound }, ...ITEMS]
+    : ITEMS
   return (
     <div className={styles.page}>
       <h1 className={styles.title}>{user?.nickname || '마이페이지'}</h1>
       <nav className={styles.menu}>
-        {ITEMS.map(({ to, label, Icon }) => (
+        {items.map(({ to, label, Icon }) => (
           <Link key={to} to={to} className={styles.menuItem}>
             <Icon size={18} className={styles.menuIcon} aria-hidden />
             <span className={styles.menuLabel}>{label}</span>

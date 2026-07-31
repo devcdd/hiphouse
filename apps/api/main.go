@@ -71,6 +71,10 @@ func main() {
 	mux.HandleFunc("GET /me", s.requireAuth(s.me))
 	mux.HandleFunc("PUT /me", s.requireAuth(s.updateMe))
 
+	// 공개 프로필 — 닉네임/평가 통계와 평가한 앨범. 로그인 없이 열람 가능.
+	mux.HandleFunc("GET /users/{id}", s.getPublicUser)
+	mux.HandleFunc("GET /users/{id}/ratings", s.listPublicRatedAlbums)
+
 	// Favorites (auth required)
 	mux.HandleFunc("GET /favorites", s.requireAuth(s.listFavorites))
 	mux.HandleFunc("POST /favorites", s.requireAuth(s.addFavorite))

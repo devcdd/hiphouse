@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { CornerDownRight, MessageSquare, Pencil, Trash2 } from 'lucide-react'
 import { useAuth } from '@/entities/session'
 import { startKakaoLogin } from '@/features/auth'
@@ -34,7 +35,14 @@ export function CommentSection({ albumId }: { albumId: string }) {
       {isReply && <CornerDownRight size={14} className={styles.replyIcon} aria-hidden />}
       <div className={styles.body}>
         <div className={styles.meta}>
-          <span className={styles.nickname}>{c.deleted ? '' : c.nickname}</span>
+          {/* 삭제된 댓글은 작성자를 드러내지 않으므로 링크도 걸지 않는다. */}
+          {c.deleted ? (
+            <span className={styles.nickname} />
+          ) : (
+            <Link to={`/users/${encodeURIComponent(c.user_id)}`} className={styles.nickname}>
+              {c.nickname}
+            </Link>
+          )}
           {!c.deleted && <time dateTime={c.created_at}>{fmt.format(new Date(c.created_at))}</time>}
           {c.edited && <span className={styles.edited}>수정됨</span>}
           {isMine(c) && (

@@ -7,6 +7,7 @@ import { SearchPage } from '@/pages/search'
 import { AuthCallbackPage } from '@/pages/auth-callback'
 import { FavoritesPage } from '@/pages/favorites'
 import { FollowedArtistsPage, MyPageMenu, NicknamePage, RatedAlbumsPage } from '@/pages/mypage'
+import { UserProfilePage } from '@/pages/user-profile'
 import { AdminPage } from '@/pages/admin'
 
 export function App() {
@@ -16,6 +17,7 @@ export function App() {
         <Route path="/" element={<AlbumsPage />} />
         <Route path="/albums/:id" element={<AlbumDetailPage />} />
         <Route path="/artists/:id" element={<ArtistDetailPage />} />
+        <Route path="/users/:id" element={<UserProfilePage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/favorites" element={<FavoritesPage />} />
         <Route path="/me" element={<MyPageMenu />} />
