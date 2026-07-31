@@ -121,10 +121,13 @@ func main() {
 	mux.HandleFunc("GET /admin/rename-requests", s.requireAdmin(s.adminListFlagged(tblRename)))
 	mux.HandleFunc("DELETE /admin/rename-requests/{id}", s.requireAdmin(s.adminClearFlags(tblRename)))
 
-	// Admin crawling — Spotify search + pull a picked artist's albums into the DB
+	// Admin crawling — Spotify search + pull a picked artist's albums (or a single
+	// picked album) into the DB
 	mux.HandleFunc("GET /admin/spotify/keys", s.requireAdmin(s.adminSpotifyKeys))
 	mux.HandleFunc("GET /admin/spotify/artists", s.requireAdmin(s.adminSpotifySearch))
 	mux.HandleFunc("POST /admin/spotify/crawl", s.requireAdmin(s.adminSpotifyCrawl))
+	mux.HandleFunc("GET /admin/spotify/albums", s.requireAdmin(s.adminSpotifyAlbumSearch))
+	mux.HandleFunc("POST /admin/spotify/crawl-album", s.requireAdmin(s.adminSpotifyCrawlAlbum))
 
 	// Admin 트랙 동기화 — batch-backfill track lists for albums that lack them
 	mux.HandleFunc("GET /admin/tracks/status", s.requireAdmin(s.adminTracksStatus))

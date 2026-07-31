@@ -23,3 +23,18 @@ export interface CrawlResult {
 export function crawlArtist(artistId: string, key = ''): Promise<CrawlResult> {
   return apiPost<CrawlResult>('/admin/spotify/crawl', { artist_id: artistId, key })
 }
+
+export interface CrawlAlbumResult {
+  album_id: string
+  album_name: string
+  saved: boolean
+  artists?: number
+  enriched?: number
+  tracks_synced?: number
+  deleted?: boolean // 행은 있으나 소프트 삭제 상태 — 삭제된 앨범 탭에서 복구해야 노출됨
+}
+
+// Admin: 앨범 검색에서 고른 앨범 1개를 DB에 추가.
+export function crawlAlbum(albumId: string, key = ''): Promise<CrawlAlbumResult> {
+  return apiPost<CrawlAlbumResult>('/admin/spotify/crawl-album', { album_id: albumId, key })
+}
