@@ -30,7 +30,16 @@ func main() {
 	port := env("PORT", "8080")
 
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, dsn)
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		log.Fatalf("db config: %v", err)
+	}
+	// JIT off. 앨범 검색은 트랙·아티스트를 EXISTS로 훑어서 추정 비용이 11만을 넘고,
+	// 그러면 Postgres 기본값(jit_above_cost=100000)이 매 요청마다 LLVM 컴파일을 돌린다.
+	// 실측(앨범 3.4k / 트랙 13.7k): JIT on 314ms, off 8ms — 컴파일 비용이 쿼리 자체보다
+	// 40배 크다. 테이블이 작고 쿼리가 짧은 이 워크로드엔 JIT가 이득을 낼 구간이 없다.
+	cfg.ConnConfig.RuntimeParams["jit"] = "off"
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		log.Fatalf("db pool: %v", err)
 	}
