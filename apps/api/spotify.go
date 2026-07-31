@@ -504,7 +504,9 @@ func (s *server) adminSpotifyAlbumSearch(w http.ResponseWriter, r *http.Request)
 			Items []spAlbum `json:"items"`
 		} `json:"albums"`
 	}
-	u := spAPI + "/search?type=album&limit=20&market=" + url.QueryEscape(market) + "&q=" + url.QueryEscape(q)
+	// limit is capped at 10 for client-credentials apps (same cap as the artist
+	// album listing above); anything higher comes back 400 "Invalid limit".
+	u := spAPI + "/search?type=album&limit=10&market=" + url.QueryEscape(market) + "&q=" + url.QueryEscape(q)
 	if err := s.spGet(r.Context(), key, u, &res); err != nil {
 		writeErr(w, 502, err.Error())
 		return
