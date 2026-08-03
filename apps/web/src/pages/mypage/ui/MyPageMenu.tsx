@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ChevronRight, Pencil, Star, Heart, UserPlus, UserRound } from 'lucide-react'
+import { ChevronRight, Lock, Pencil, Star, Heart, UserPlus, UserRound } from 'lucide-react'
 import { useAuth } from '@/entities/session'
 import { AuthGate } from './AuthGate'
 import styles from './MyPage.module.css'
@@ -10,6 +10,7 @@ const ITEMS = [
   { to: '/me/rated', label: '내가 평가한 앨범', Icon: Star },
   { to: '/favorites', label: '내가 즐겨찾기 한 앨범', Icon: Heart },
   { to: '/me/following', label: '내가 팔로우한 아티스트', Icon: UserPlus },
+  { to: '/me/privacy', label: '공개 설정', Icon: Lock },
 ]
 
 export function MyPageMenu() {

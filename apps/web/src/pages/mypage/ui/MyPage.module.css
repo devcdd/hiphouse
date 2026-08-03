@@ -120,6 +120,36 @@
   cursor: default;
 }
 
+/* --- 공개 설정 (/me/privacy) --- */
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.toggleLabel {
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* 네이티브 체크박스 + accent-color: 라이트/다크 어느 쪽이든 테마 색을 따라간다. */
+.checkbox {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  accent-color: var(--fg);
+  cursor: pointer;
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
 /* --- album grid (/me/rated) --- */
 .grid {
   display: grid;

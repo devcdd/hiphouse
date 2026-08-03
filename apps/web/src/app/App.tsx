@@ -6,7 +6,7 @@ import { ArtistDetailPage } from '@/pages/artist-detail'
 import { SearchPage } from '@/pages/search'
 import { AuthCallbackPage } from '@/pages/auth-callback'
 import { FavoritesPage } from '@/pages/favorites'
-import { FollowedArtistsPage, MyPageMenu, NicknamePage, RatedAlbumsPage } from '@/pages/mypage'
+import { FollowedArtistsPage, MyPageMenu, NicknamePage, PrivacyPage, RatedAlbumsPage } from '@/pages/mypage'
 import { UserProfilePage } from '@/pages/user-profile'
 import { AdminPage } from '@/pages/admin'
 
@@ -24,6 +24,7 @@ export function App() {
         <Route path="/me/nickname" element={<NicknamePage />} />
         <Route path="/me/rated" element={<RatedAlbumsPage />} />
         <Route path="/me/following" element={<FollowedArtistsPage />} />
+        <Route path="/me/privacy" element={<PrivacyPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/auth/kakao/callback" element={<AuthCallbackPage />} />
       </Route>
