@@ -27,6 +27,7 @@ go run ./apps/api                      # → http://localhost:8080
 | DELETE | `/albums/{id}` | 삭제 |
 | GET | `/albums/{id}/tracks` | 앨범 트랙 목록 (동기화 전이면 `[]`) |
 | GET/POST/GET/PUT/DELETE | `/artists`, `/artists/{id}` | 위와 동일 |
+| GET | `/admin/users` | 회원 목록. `?q=&limit=&offset=` (관리자) |
 | GET | `/admin/tracks/status` | 트랙 동기화 현황 (관리자) |
 | POST | `/admin/tracks/backfill` | 트랙 미동기화 앨범 배치 백필 (관리자) |
 | GET | `/healthz` | 헬스체크 |

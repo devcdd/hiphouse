@@ -10,12 +10,13 @@ import { ReleasesTab } from './ReleasesTab'
 import { StatsTab } from './StatsTab'
 import { ReportsTab } from './ReportsTab'
 import { RenameRequestsTab } from './RenameRequestsTab'
+import { UsersTab } from './UsersTab'
 import 'swiper/css'
 import 'swiper/css/free-mode'
 import 'swiper/css/mousewheel'
 import styles from './AdminPage.module.css'
 
-type Tab = 'deleted' | 'aliases' | 'crawl' | 'tracks' | 'releases' | 'stats' | 'reports' | 'rename'
+type Tab = 'deleted' | 'aliases' | 'crawl' | 'tracks' | 'releases' | 'stats' | 'reports' | 'rename' | 'users'
 const TABS: { key: Tab; label: string }[] = [
   { key: 'crawl', label: '크롤링' },
   { key: 'releases', label: '신보 체크' },
@@ -24,6 +25,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'deleted', label: '삭제된 앨범' },
   { key: 'reports', label: '힙합 아님 신고' },
   { key: 'rename', label: '이름 변경 요청' },
+  { key: 'users', label: '회원' },
   { key: 'stats', label: '통계' },
 ]
 
@@ -31,16 +33,8 @@ export function AdminPage() {
   const { isAdmin, isLoading } = useAuth()
   const [params, setParams] = useSearchParams()
   const raw = params.get('tab')
-  const tab: Tab =
-    raw === 'aliases' ||
-    raw === 'deleted' ||
-    raw === 'stats' ||
-    raw === 'reports' ||
-    raw === 'tracks' ||
-    raw === 'releases' ||
-    raw === 'rename'
-      ? raw
-      : 'crawl'
+  // 탭 목록이 곧 허용 값 — 탭을 추가할 때 여기도 고쳐야 하는 중복을 없앤다.
+  const tab: Tab = TABS.some((t) => t.key === raw) ? (raw as Tab) : 'crawl'
 
   if (isLoading) return <p className={styles.state}>확인 중…</p>
   if (!isAdmin) return <p className={styles.state}>관리자 전용 페이지입니다.</p>
@@ -91,6 +85,8 @@ export function AdminPage() {
         <ReportsTab />
       ) : tab === 'rename' ? (
         <RenameRequestsTab />
+      ) : tab === 'users' ? (
+        <UsersTab />
       ) : (
         <AliasManagerTab />
       )}

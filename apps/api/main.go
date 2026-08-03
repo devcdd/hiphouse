@@ -133,6 +133,7 @@ func main() {
 	mux.HandleFunc("DELETE /artists/{id}", s.requireAdmin(s.deleteArtist))
 
 	mux.HandleFunc("GET /admin/stats", s.requireAdmin(s.adminStats))
+	mux.HandleFunc("GET /admin/users", s.requireAdmin(s.adminListUsers))
 	mux.HandleFunc("GET /admin/not-hiphop", s.requireAdmin(s.adminListFlagged(tblNotHiphop)))
 	mux.HandleFunc("DELETE /admin/not-hiphop/{id}", s.requireAdmin(s.adminClearFlags(tblNotHiphop)))
 	mux.HandleFunc("GET /admin/rename-requests", s.requireAdmin(s.adminListFlagged(tblRename)))

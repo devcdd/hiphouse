@@ -744,3 +744,49 @@
   background: var(--surface);
 }
 
+/* --- 회원 목록 --- */
+
+.roleBadge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--fg);
+  color: var(--bg);
+  font-size: 0.62rem;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.userCounts {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.userCounts span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.moreBtn {
+  align-self: center;
+  padding: 9px 20px;
+  border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
+  border-radius: 999px;
+  background: none;
+  color: var(--fg);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.moreBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
