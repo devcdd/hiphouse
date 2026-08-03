@@ -1,0 +1,74 @@
+.page {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 64px 24px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.greeting {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.lead {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0 0 14px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+}
+
+.input {
+  flex: 1;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.input:focus {
+  outline: 2px solid var(--muted);
+  outline-offset: -1px;
+}
+
+.save {
+  flex: 0 0 auto;
+  padding: 9px 18px;
+  border: none;
+  border-radius: 8px;
+  background: var(--fg);
+  color: var(--bg);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.save:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

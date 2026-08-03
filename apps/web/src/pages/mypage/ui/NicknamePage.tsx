@@ -32,7 +32,8 @@ function Editor() {
       qc.setQueryData(['me'], u)
       toast('닉네임을 바꿨습니다')
     },
-    onError: () => toast('닉네임 변경에 실패했습니다', 'error'),
+    // 409(중복)면 서버 문구를 그대로 보여준다.
+    onError: (e: Error) => toast(e.message || '닉네임 변경에 실패했습니다', 'error'),
   })
 
   const trimmed = draft.trim()

@@ -7,7 +7,15 @@ function authHeaders(): HeadersInit {
 }
 
 async function handle<T>(res: Response): Promise<T> {
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  if (!res.ok) {
+    // 서버는 실패를 {"error": "..."}로 준다. 있으면 그 문장을 그대로 쓰고,
+    // 없으면(프록시 오류, 빈 본문) 상태 코드로 떨어진다.
+    const msg = await res
+      .json()
+      .then((d: unknown) => (d as { error?: string })?.error)
+      .catch(() => undefined)
+    throw new Error(msg || `${res.status} ${res.statusText}`)
+  }
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }

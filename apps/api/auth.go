@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type User struct {
@@ -23,10 +24,14 @@ type User struct {
 	// everything on the public profile (see users.go). Sent on GET/PUT /me and,
 	// so the profile page can explain itself, on GET /users/{id} too.
 	ProfilePublic bool `json:"profile_public" db:"profile_public"`
+	// NicknameSet is false until the user saves a nickname themselves; the web
+	// app uses it to show the first-login greeting + nickname setup.
+	NicknameSet bool `json:"nickname_set" db:"nickname_set"`
 }
 
-// userCols is the shape every User scan expects; keep it in step with scanUser.
-const userCols = "id,nickname,role,profile_public"
+// userCols is the shape every User scan expects; keep it in step with the Scan
+// argument order at each call site.
+const userCols = "id,nickname,role,profile_public,nickname_set"
 
 type ctxKey string
 
@@ -219,7 +224,7 @@ func (s *server) loginKakao(w http.ResponseWriter, r *http.Request) {
 
 	var u User
 	if err := s.db.QueryRow(r.Context(), "SELECT "+userCols+" FROM users WHERE id=$1", id).
-		Scan(&u.ID, &u.Nickname, &u.Role, &u.ProfilePublic); err != nil {
+		Scan(&u.ID, &u.Nickname, &u.Role, &u.ProfilePublic, &u.NicknameSet); err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
@@ -234,7 +239,7 @@ func (s *server) loginKakao(w http.ResponseWriter, r *http.Request) {
 func (s *server) me(w http.ResponseWriter, r *http.Request) {
 	var u User
 	if err := s.db.QueryRow(r.Context(), "SELECT "+userCols+" FROM users WHERE id=$1", currentUser(r).ID).
-		Scan(&u.ID, &u.Nickname, &u.Role, &u.ProfilePublic); err != nil {
+		Scan(&u.ID, &u.Nickname, &u.Role, &u.ProfilePublic, &u.NicknameSet); err != nil {
 		writeErr(w, 404, "user not found")
 		return
 	}
@@ -275,11 +280,21 @@ func (s *server) updateMe(w http.ResponseWriter, r *http.Request) {
 		nick = &clean
 	}
 	var u User
-	if err := s.db.QueryRow(r.Context(),
-		"UPDATE users SET nickname=COALESCE($2,nickname), profile_public=COALESCE($3,profile_public) "+
-			"WHERE id=$1 RETURNING "+userCols,
+	// nickname_set: 닉네임을 실제로 보낸 요청에서만 켜지고, 한 번 켜지면 내려가지
+	// 않는다 — 공개 설정만 바꾸는 PUT이 온보딩 상태를 건드리면 안 된다.
+	err := s.db.QueryRow(r.Context(),
+		"UPDATE users SET nickname=COALESCE($2,nickname), nickname_set=nickname_set OR $2 IS NOT NULL, "+
+			"profile_public=COALESCE($3,profile_public) WHERE id=$1 RETURNING "+userCols,
 		currentUser(r).ID, nick, body.ProfilePublic).
-		Scan(&u.ID, &u.Nickname, &u.Role, &u.ProfilePublic); err != nil {
+		Scan(&u.ID, &u.Nickname, &u.Role, &u.ProfilePublic, &u.NicknameSet)
+	// 중복은 DB의 부분 유니크 인덱스가 잡는다. 미리 SELECT로 확인하면 확인과 UPDATE
+	// 사이에 남이 같은 이름을 채가는 경합이 남는다.
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		writeErr(w, 409, "이미 사용 중인 닉네임입니다")
+		return
+	}
+	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}

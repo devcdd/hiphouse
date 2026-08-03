@@ -9,6 +9,7 @@ import { FavoritesPage } from '@/pages/favorites'
 import { FollowedArtistsPage, MyPageMenu, NicknamePage, PrivacyPage, RatedAlbumsPage } from '@/pages/mypage'
 import { UserProfilePage } from '@/pages/user-profile'
 import { AdminPage } from '@/pages/admin'
+import { WelcomePage } from '@/pages/welcome'
 
 export function App() {
   return (
@@ -20,6 +21,7 @@ export function App() {
         <Route path="/users/:id" element={<UserProfilePage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/favorites" element={<FavoritesPage />} />
+        <Route path="/welcome" element={<WelcomePage />} />
         <Route path="/me" element={<MyPageMenu />} />
         <Route path="/me/nickname" element={<NicknamePage />} />
         <Route path="/me/rated" element={<RatedAlbumsPage />} />
