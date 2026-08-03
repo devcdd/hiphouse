@@ -203,6 +203,17 @@
   color: var(--bg);
 }
 
+/* 보유 앨범 미리보기를 여는 배지 — 배지 모양 그대로 누를 수 있게만 만든다. */
+.dbBadgeBtn {
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.dbBadgeBtn:hover {
+  opacity: 0.85;
+}
+
 .crawlBtn {
   flex: none;
   display: flex;
@@ -702,3 +713,34 @@
   opacity: 0.5;
   cursor: default;
 }
+
+/* --- 보유 앨범 미리보기 (크롤링 탭 다이얼로그) --- */
+
+.previewList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: min(55vh, 420px);
+  overflow-y: auto;
+}
+
+.previewRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.previewRow .rowInfo {
+  flex: 1;
+  width: auto;
+}
+
+.previewThumb {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--surface);
+}
+
