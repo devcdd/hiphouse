@@ -183,6 +183,24 @@ func (s *server) ensureAuthSchema(ctx context.Context) error {
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		);
 		CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
+		-- 닉네임을 본인이 정했는지. 첫 로그인 직후엔 카카오 프로필 이름이 그대로 들어가
+		-- 있을 뿐이라 "설정함"으로 볼 수 없다. 기존 유저는 다시 온보딩을 보면 안 되므로
+		-- DEFAULT true로 추가해 백필한 뒤, 신규 행을 위해 기본값을 false로 낮춘다.
+		ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS nickname_set BOOLEAN NOT NULL DEFAULT true;
+		ALTER TABLE IF EXISTS users ALTER COLUMN nickname_set SET DEFAULT false;
+		-- 닉네임 중복 금지. nickname_set인 행에만 걸어 카카오가 준 이름이 이미 쓰이고
+		-- 있어도 첫 로그인 INSERT가 실패하지 않게 한다 — 온보딩에서 고유한 값을 받는다.
+		-- 인덱스 생성 전에 기존 중복을 한 번 정리한다(먼저 가입한 사람이 원본 유지).
+		-- ponytail: 접미사가 또 겹치면 인덱스 생성이 실패한다. id 뒤 4자리라 사실상
+		-- 안 겹치고, 겹치면 부팅 로그에 23505가 그대로 뜨니 그때 수동 정리.
+		UPDATE users u SET nickname = left(u.nickname, 15) || '-' || right(u.id, 4)
+		FROM (
+			SELECT id, row_number() OVER (PARTITION BY lower(nickname) ORDER BY created_at, id) AS rn
+			FROM users WHERE nickname_set AND nickname <> ''
+		) d
+		WHERE u.id = d.id AND d.rn > 1;
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_users_nickname
+			ON users (lower(nickname)) WHERE nickname_set AND nickname <> '';
 		CREATE TABLE IF NOT EXISTS favorites (
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			album_id TEXT NOT NULL,

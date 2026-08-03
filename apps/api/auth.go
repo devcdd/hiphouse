@@ -13,13 +13,21 @@ import (
 	"unicode/utf8"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type User struct {
 	ID       string `json:"id" db:"id"`
 	Nickname string `json:"nickname" db:"nickname"`
 	Role     string `json:"role" db:"role"`
+	// NicknameSet is false until the user saves a nickname themselves; the web
+	// app uses it to show the first-login greeting + nickname setup.
+	NicknameSet bool `json:"nickname_set" db:"nickname_set"`
 }
+
+// userCols is the column list every "return the session user" query selects, in
+// User field order.
+const userCols = "id,nickname,role,nickname_set"
 
 type ctxKey string
 
@@ -211,8 +219,8 @@ func (s *server) loginKakao(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var u User
-	if err := s.db.QueryRow(r.Context(), "SELECT id,nickname,role FROM users WHERE id=$1", id).
-		Scan(&u.ID, &u.Nickname, &u.Role); err != nil {
+	if err := s.db.QueryRow(r.Context(), "SELECT "+userCols+" FROM users WHERE id=$1", id).
+		Scan(&u.ID, &u.Nickname, &u.Role, &u.NicknameSet); err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
@@ -226,8 +234,8 @@ func (s *server) loginKakao(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) me(w http.ResponseWriter, r *http.Request) {
 	var u User
-	if err := s.db.QueryRow(r.Context(), "SELECT id,nickname,role FROM users WHERE id=$1", currentUser(r).ID).
-		Scan(&u.ID, &u.Nickname, &u.Role); err != nil {
+	if err := s.db.QueryRow(r.Context(), "SELECT "+userCols+" FROM users WHERE id=$1", currentUser(r).ID).
+		Scan(&u.ID, &u.Nickname, &u.Role, &u.NicknameSet); err != nil {
 		writeErr(w, 404, "user not found")
 		return
 	}
@@ -261,9 +269,18 @@ func (s *server) updateMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var u User
-	if err := s.db.QueryRow(r.Context(),
-		"UPDATE users SET nickname=$2 WHERE id=$1 RETURNING id,nickname,role",
-		currentUser(r).ID, nick).Scan(&u.ID, &u.Nickname, &u.Role); err != nil {
+	// nickname_set=true: 본인이 직접 저장한 순간부터 온보딩을 다시 띄우지 않는다.
+	err := s.db.QueryRow(r.Context(),
+		"UPDATE users SET nickname=$2, nickname_set=true WHERE id=$1 RETURNING "+userCols,
+		currentUser(r).ID, nick).Scan(&u.ID, &u.Nickname, &u.Role, &u.NicknameSet)
+	// 중복은 DB의 부분 유니크 인덱스가 잡는다. 미리 SELECT로 확인하면 확인과 UPDATE
+	// 사이에 남이 같은 이름을 채가는 경합이 남는다.
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		writeErr(w, 409, "이미 사용 중인 닉네임입니다")
+		return
+	}
+	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}

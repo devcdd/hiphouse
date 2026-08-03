@@ -101,8 +101,8 @@ func (s *server) refreshSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var u User
-	if err := s.db.QueryRow(r.Context(), "SELECT id,nickname,role FROM users WHERE id=$1", userID).
-		Scan(&u.ID, &u.Nickname, &u.Role); err != nil {
+	if err := s.db.QueryRow(r.Context(), "SELECT "+userCols+" FROM users WHERE id=$1", userID).
+		Scan(&u.ID, &u.Nickname, &u.Role, &u.NicknameSet); err != nil {
 		writeErr(w, 401, "user not found")
 		return
 	}
