@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Download, Search, X } from 'lucide-react'
 import { Avatar } from '@/shared/ui/Avatar'
 import { useDebouncedValue } from '@/shared/lib/useDebouncedValue'
-import { searchSpotifyAlbums, searchSpotifyArtists } from '../api/spotifyAdminApi'
+import { fetchAlbums } from '@/entities/album'
+import { searchSpotifyAlbums, searchSpotifyArtists, type SpotifyArtistHit } from '../api/spotifyAdminApi'
 import { crawlAlbum, crawlArtist, fetchSpotifyKeys } from '@/features/crawl-artist'
 import styles from './AdminPage.module.css'
 
@@ -29,6 +30,8 @@ export function CrawlTab() {
   // 참여·컴필레이션 앨범(include_groups=appears_on,compilation)까지 수집할지.
   // 쇼미더머니류를 담을 때만 켜는 명시적 토글 — 노이즈가 많아 기본은 꺼짐.
   const [appearsOn, setAppearsOn] = useState(false)
+  // DB에 이미 앨범이 있는 아티스트: 뭐가 들어있는지 팝업으로 확인하고 나서 다시 긁을지 정한다.
+  const [preview, setPreview] = useState<SpotifyArtistHit | null>(null)
 
   const artistSearch = useQuery({
     queryKey: ['spotify-search', q, key],
@@ -161,9 +164,18 @@ export function CrawlTab() {
                 </span>
                 <span className={styles.rowId}>팔로워 {nf.format(hit.followers)}</span>
               </div>
-              <span className={hit.albums_in_db > 0 ? `${styles.dbBadge} ${styles.dbBadgeHas}` : styles.dbBadge}>
-                {hit.albums_in_db > 0 ? `DB ${hit.albums_in_db}개` : '미등록'}
-              </span>
+              {hit.albums_in_db > 0 ? (
+                <button
+                  type="button"
+                  className={`${styles.dbBadge} ${styles.dbBadgeHas} ${styles.dbBadgeBtn}`}
+                  onClick={() => setPreview(hit)}
+                  aria-label={`${hit.name} 보유 앨범 보기`}
+                >
+                  DB {hit.albums_in_db}개
+                </button>
+              ) : (
+                <span className={styles.dbBadge}>미등록</span>
+              )}
               <button
                 type="button"
                 className={styles.crawlBtn}
@@ -223,6 +235,70 @@ export function CrawlTab() {
             : '앨범명으로 Spotify를 검색하세요. artist:이름, year:2024 같은 조건도 붙일 수 있습니다.'}
         </p>
       )}
+
+      {preview && <ArtistAlbumsDialog artist={preview} onClose={() => setPreview(null)} />}
     </div>
+  )
+}
+
+// 검색 결과의 「DB n개」를 누르면 뜨는 미리보기 — 우리가 이미 가진 앨범을 보여준다.
+// 공개 목록과 같은 GET /albums?artist_id= 를 쓰므로 서버에 새 경로가 필요 없다.
+function ArtistAlbumsDialog({ artist, onClose }: { artist: SpotifyArtistHit; onClose: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null)
+  useEffect(() => {
+    dialog.current?.showModal()
+  }, [])
+
+  // 첫 페이지(40장)만 — 확인용 미리보기지 전체 목록이 아니다.
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['albums', { artistId: artist.id, preview: true }],
+    queryFn: () => fetchAlbums({ artistId: artist.id, offset: 0 }),
+  })
+
+  return (
+    <dialog
+      ref={dialog}
+      className={styles.confirm}
+      onClose={onClose}
+      onClick={(e) => e.target === dialog.current && onClose()}
+    >
+      <div className={styles.confirmSheet}>
+        <p className={styles.confirmTitle}>
+          {artist.name} · DB {artist.albums_in_db}개
+        </p>
+
+        {isLoading && <p className={styles.state}>불러오는 중…</p>}
+        {error && <p className={styles.state}>불러오기 실패: {String(error)}</p>}
+
+        <div className={styles.previewList}>
+          {(data ?? []).map((al) => (
+            <div key={al.id} className={styles.previewRow}>
+              {al.image_url ? (
+                <img src={al.image_url} alt="" className={styles.previewThumb} loading="lazy" />
+              ) : (
+                <div className={styles.previewThumb} aria-hidden />
+              )}
+              <div className={styles.rowInfo}>
+                <span className={styles.rowName} title={al.display_name ?? al.name}>
+                  {al.display_name ?? al.name}
+                </span>
+                <span className={styles.rowId}>
+                  {[al.year, al.type_label, al.total_tracks ? `${al.total_tracks}곡` : null]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+        {!isLoading && !error && (data?.length ?? 0) === 0 && (
+          <p className={styles.state}>표시할 앨범이 없습니다. (삭제되었을 수 있습니다)</p>
+        )}
+
+        <button type="button" className={styles.confirmCancel} onClick={onClose}>
+          닫기
+        </button>
+      </div>
+    </dialog>
   )
 }

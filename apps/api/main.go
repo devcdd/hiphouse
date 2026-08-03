@@ -133,6 +133,7 @@ func main() {
 	mux.HandleFunc("DELETE /artists/{id}", s.requireAdmin(s.deleteArtist))
 
 	mux.HandleFunc("GET /admin/stats", s.requireAdmin(s.adminStats))
+	mux.HandleFunc("GET /admin/users", s.requireAdmin(s.adminListUsers))
 	mux.HandleFunc("GET /admin/not-hiphop", s.requireAdmin(s.adminListFlagged(tblNotHiphop)))
 	mux.HandleFunc("DELETE /admin/not-hiphop/{id}", s.requireAdmin(s.adminClearFlags(tblNotHiphop)))
 	mux.HandleFunc("GET /admin/rename-requests", s.requireAdmin(s.adminListFlagged(tblRename)))
@@ -183,6 +184,11 @@ func (s *server) ensureAuthSchema(ctx context.Context) error {
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		);
 		CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
+		-- 프로필 공개 스위치 하나로 남에게 보이는 활동을 전부 여닫는다: 끄면 공개
+		-- 프로필에 닉네임과 가입일만 남는다 (평가 목록·평가/댓글 집계 전부 차단).
+		-- 팔로우·즐겨찾기는 애초에 공개 엔드포인트가 없어 이 플래그와 무관하게 비공개다.
+		-- 기본은 공개 — 기존 사용자의 프로필이 마이그레이션만으로 비어버리면 안 된다.
+		ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS profile_public BOOLEAN NOT NULL DEFAULT true;
 		-- 닉네임을 본인이 정했는지. 첫 로그인 직후엔 카카오 프로필 이름이 그대로 들어가
 		-- 있을 뿐이라 "설정함"으로 볼 수 없다. 기존 유저는 다시 온보딩을 보면 안 되므로
 		-- DEFAULT true로 추가해 백필한 뒤, 신규 행을 위해 기본값을 false로 낮춘다.

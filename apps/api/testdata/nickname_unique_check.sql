@@ -26,6 +26,7 @@ INSERT INTO users(id, nickname, created_at) VALUES
 	('1000000006', '',        now());
 
 -- === main.go ensureAuthSchema 의 users 관련 구문 그대로 ===
+ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS profile_public BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS nickname_set BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE IF EXISTS users ALTER COLUMN nickname_set SET DEFAULT false;
 UPDATE users u SET nickname = left(u.nickname, 15) || '-' || right(u.id, 4)
@@ -75,16 +76,26 @@ DO $$ BEGIN
 	ASSERT (SELECT nickname_set FROM users WHERE id='2000000001') = false, '신규 유저가 nickname_set=true 로 들어옴';
 END $$;
 
--- 6) 온보딩 저장(PUT /me)에서 중복이면 23505
+-- 6) 온보딩 저장(PUT /me)에서 중복이면 23505 (updateMe 의 UPDATE 문 그대로)
 DO $$ BEGIN
-	UPDATE users SET nickname='HipHop', nickname_set=true WHERE id='2000000001';
+	UPDATE users SET nickname=COALESCE('HipHop',nickname), nickname_set=nickname_set OR 'HipHop' IS NOT NULL,
+	                 profile_public=COALESCE(NULL,profile_public) WHERE id='2000000001';
 	RAISE EXCEPTION '중복 닉네임이 통과됨';
 EXCEPTION WHEN unique_violation THEN
 	RAISE NOTICE 'ok: 중복 닉네임 23505';
 END $$;
 
--- 7) 고유하면 저장된다
-UPDATE users SET nickname='hiphop2', nickname_set=true WHERE id='2000000001';
+-- 7) 공개 설정만 바꾸는 PUT /me 는 nickname_set 을 켜지 않는다 (온보딩 상태 유지)
+UPDATE users SET nickname=COALESCE(NULL,nickname), nickname_set=nickname_set OR NULL IS NOT NULL,
+                 profile_public=COALESCE(false,profile_public) WHERE id='2000000001';
+DO $$ BEGIN
+	ASSERT (SELECT nickname_set FROM users WHERE id='2000000001') = false, '공개 설정 변경이 온보딩을 끝내버림';
+	ASSERT (SELECT profile_public FROM users WHERE id='2000000001') = false, '공개 설정이 안 바뀜';
+END $$;
+
+-- 8) 고유하면 저장되고 nickname_set 이 켜진다
+UPDATE users SET nickname=COALESCE('hiphop2',nickname), nickname_set=nickname_set OR 'hiphop2' IS NOT NULL,
+                 profile_public=COALESCE(NULL,profile_public) WHERE id='2000000001';
 DO $$ BEGIN
 	ASSERT (SELECT nickname_set FROM users WHERE id='2000000001'), '고유 닉네임 저장 실패';
 END $$;

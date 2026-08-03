@@ -5,7 +5,7 @@
   "packageManager": "pnpm@10.33.0",
   "scripts": {
     "dev": "docker compose up -d --wait db && concurrently -k -n api,web -c cyan,magenta \"pnpm dev:api\" \"pnpm dev:web\"",
-    "dev:api": "cd apps/api && go run .",
+    "dev:api": "cd apps/api && go tool wgo run .",
     "dev:web": "pnpm --filter @hiphouse/web dev",
     "crawl": "pnpm --filter @hiphouse/crawler crawl",
     "search": "pnpm --filter @hiphouse/crawler search",
