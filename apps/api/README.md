@@ -9,6 +9,9 @@ docker compose up -d --wait db        # 루트에서, Postgres 먼저
 go run ./apps/api                      # → http://localhost:8080
 ```
 
+`pnpm dev`(또는 `pnpm dev:api`)는 `go tool wgo run .`으로 띄운다 — `.go` 파일을 저장하면
+서버가 알아서 재시작한다. wgo는 `go.mod`의 `tool` 지시자에 박혀 있어 별도 설치가 필요 없다.
+
 `DATABASE_URL`(기본 `postgres://hiphouse:hiphouse@localhost:5432/hiphouse`) / `PORT`(기본 `8080`) 환경변수로 덮어쓰기.
 
 ## Swagger
