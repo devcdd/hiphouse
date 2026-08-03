@@ -5,7 +5,7 @@ export interface PublicUser {
   id: string
   nickname: string
   created_at: string
-  profile_public: boolean // false = 본인이 프로필을 비공개로 설정 → 아래 집계는 전부 0/null
+  profile_public: boolean // false = 주인이 비공개로 설정. 남이 보면 아래 집계는 전부 0/null, 주인 본인이 보면 그대로 온다
   rating_count: number
   rating_avg: number | null // 별점 0..5, 평가가 없으면 null
   comment_count: number

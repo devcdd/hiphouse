@@ -105,6 +105,18 @@ func (s *server) isAdminReq(r *http.Request) bool {
 	return err == nil && role == "admin"
 }
 
+// callerID는 같은 방식으로 신원만 본다. 로그인한 사용자의 id, 토큰이 없거나 잘못됐으면
+// "". 공개 읽기에서 주인 본인에게만 가려진 내용을 열어 주려고 쓴다 — 이걸 requireAuth로
+// 바꾸면 비로그인 방문자가 프로필을 아예 못 본다.
+func (s *server) callerID(r *http.Request) string {
+	tok := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	id, _, err := s.parseToken(tok)
+	if err != nil {
+		return ""
+	}
+	return id
+}
+
 // --- Kakao OAuth ---
 
 type kakaoUser struct {

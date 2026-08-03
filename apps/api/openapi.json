@@ -147,7 +147,7 @@
       "get": {
         "tags": ["users"],
         "summary": "공개 프로필",
-        "description": "닉네임·가입일과 평가/댓글 집계. 로그인 없이 조회 가능. user_id와 nickname은 댓글 API가 이미 공개하는 값이다. 프로필 비공개(profile_public=false)면 활동 집계 셋(rating_count/rating_avg/comment_count)이 모두 0/null로 가려지고 닉네임·가입일만 남는다.",
+        "description": "닉네임·가입일과 평가/댓글 집계. 로그인 없이 조회 가능. user_id와 nickname은 댓글 API가 이미 공개하는 값이다. 프로필 비공개(profile_public=false)면 활동 집계 셋(rating_count/rating_avg/comment_count)이 모두 0/null로 가려지고 닉네임·가입일만 남는다. 단 Bearer 토큰의 주인이 이 프로필 본인이면 비공개여도 집계가 그대로 나간다.",
         "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
         "responses": {
           "200": {
@@ -155,7 +155,7 @@
             "content": { "application/json": { "schema": { "type": "object", "properties": {
               "id": { "type": "string" }, "nickname": { "type": "string" },
               "created_at": { "type": "string", "format": "date-time" },
-              "profile_public": { "type": "boolean", "description": "false = 본인이 프로필을 비공개로 설정. 이 프로필의 활동 집계와 평가 목록이 전부 가려진다. 팔로우·즐겨찾기는 공개 엔드포인트 자체가 없어 이 플래그와 무관하게 항상 비공개" },
+              "profile_public": { "type": "boolean", "description": "false = 주인이 프로필을 비공개로 설정. 남에게는 이 프로필의 활동 집계와 평가 목록이 전부 가려진다(주인 본인에게는 그대로 보인다). 팔로우·즐겨찾기는 공개 엔드포인트 자체가 없어 이 플래그와 무관하게 항상 비공개" },
               "rating_count": { "type": "integer" },
               "rating_avg": { "type": "number", "nullable": true, "description": "별점 0..5. 평가가 없으면 null" },
               "comment_count": { "type": "integer" }
@@ -169,7 +169,7 @@
       "get": {
         "tags": ["users"],
         "summary": "그 사용자가 평가한 앨범",
-        "description": "앨범 행에 그 사용자가 준 score(하프스타 1..10)를 얹어 최근 평가순으로 반환. 삭제된 앨범은 제외. 프로필 비공개 사용자는 빈 배열 — 비공개인지 평가가 없는지는 GET /users/{id}의 profile_public으로 구분한다.",
+        "description": "앨범 행에 그 사용자가 준 score(하프스타 1..10)를 얹어 최근 평가순으로 반환. 삭제된 앨범은 제외. 프로필 비공개 사용자는 빈 배열 — 비공개인지 평가가 없는지는 GET /users/{id}의 profile_public으로 구분한다. Bearer 토큰의 주인이 이 프로필 본인이면 비공개여도 목록이 그대로 나간다.",
         "parameters": [
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
           { "name": "limit", "in": "query", "schema": { "type": "integer" } },
