@@ -42,3 +42,20 @@ func TestPublicUserHidesAggregatesWhenPrivate(t *testing.T) {
 		}
 	}
 }
+
+// 주인 예외는 caller와 프로필 주인을 직접 비교해야 한다. 상수를 고정 true나 다른
+// 자리 값으로 잘못 고치면 비공개 프로필이 아무에게나 열린다.
+func TestOwnerBypassBindsCaller(t *testing.T) {
+	if !strings.Contains(visibleToViewer, "u.profile_public OR u.id = $2") {
+		t.Errorf("header gate must OR the owner check onto the flag: %s", visibleToViewer)
+	}
+	if !strings.Contains(profilePrivacyGuard, "pu.profile_public OR pu.id = $4") {
+		t.Errorf("ratings guard must OR the owner check onto the flag: %s", profilePrivacyGuard)
+	}
+	// caller는 placeholder여야 한다 — 문자열로 이어붙이면 SQL 인젝션이다.
+	for _, sql := range []string{publicUserSQL, publicRatedAlbumsSQL} {
+		if strings.Contains(sql, "'") && strings.Contains(sql, "u.id = '") {
+			t.Errorf("caller id must be a bind parameter, not inlined: %s", sql)
+		}
+	}
+}
