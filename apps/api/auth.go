@@ -19,7 +19,14 @@ type User struct {
 	ID       string `json:"id" db:"id"`
 	Nickname string `json:"nickname" db:"nickname"`
 	Role     string `json:"role" db:"role"`
+	// ProfilePublic is the single switch for "남한테 내 활동 보이기": off hides
+	// everything on the public profile (see users.go). Sent on GET/PUT /me and,
+	// so the profile page can explain itself, on GET /users/{id} too.
+	ProfilePublic bool `json:"profile_public" db:"profile_public"`
 }
+
+// userCols is the shape every User scan expects; keep it in step with scanUser.
+const userCols = "id,nickname,role,profile_public"
 
 type ctxKey string
 
@@ -211,8 +218,8 @@ func (s *server) loginKakao(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var u User
-	if err := s.db.QueryRow(r.Context(), "SELECT id,nickname,role FROM users WHERE id=$1", id).
-		Scan(&u.ID, &u.Nickname, &u.Role); err != nil {
+	if err := s.db.QueryRow(r.Context(), "SELECT "+userCols+" FROM users WHERE id=$1", id).
+		Scan(&u.ID, &u.Nickname, &u.Role, &u.ProfilePublic); err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
@@ -226,8 +233,8 @@ func (s *server) loginKakao(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) me(w http.ResponseWriter, r *http.Request) {
 	var u User
-	if err := s.db.QueryRow(r.Context(), "SELECT id,nickname,role FROM users WHERE id=$1", currentUser(r).ID).
-		Scan(&u.ID, &u.Nickname, &u.Role); err != nil {
+	if err := s.db.QueryRow(r.Context(), "SELECT "+userCols+" FROM users WHERE id=$1", currentUser(r).ID).
+		Scan(&u.ID, &u.Nickname, &u.Role, &u.ProfilePublic); err != nil {
 		writeErr(w, 404, "user not found")
 		return
 	}
@@ -247,23 +254,32 @@ func validateNickname(raw string) (string, string) {
 	return n, ""
 }
 
-// updateMe lets the signed-in user change their own nickname (PUT /me).
+// updateMe lets the signed-in user change their own settings (PUT /me).
+// Both fields are pointers so a caller can send just one: the nickname editor and
+// the 공개 설정 토글 are separate screens and neither knows the other's value.
 func (s *server) updateMe(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Nickname string `json:"nickname"`
+		Nickname      *string `json:"nickname"`
+		ProfilePublic *bool   `json:"profile_public"`
 	}
 	if !decode(w, r, &body) {
 		return
 	}
-	nick, msg := validateNickname(body.Nickname)
-	if msg != "" {
-		writeErr(w, 400, msg)
-		return
+	var nick *string
+	if body.Nickname != nil {
+		clean, msg := validateNickname(*body.Nickname)
+		if msg != "" {
+			writeErr(w, 400, msg)
+			return
+		}
+		nick = &clean
 	}
 	var u User
 	if err := s.db.QueryRow(r.Context(),
-		"UPDATE users SET nickname=$2 WHERE id=$1 RETURNING id,nickname,role",
-		currentUser(r).ID, nick).Scan(&u.ID, &u.Nickname, &u.Role); err != nil {
+		"UPDATE users SET nickname=COALESCE($2,nickname), profile_public=COALESCE($3,profile_public) "+
+			"WHERE id=$1 RETURNING "+userCols,
+		currentUser(r).ID, nick, body.ProfilePublic).
+		Scan(&u.ID, &u.Nickname, &u.Role, &u.ProfilePublic); err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
