@@ -6,6 +6,7 @@ import {
   mergeArtists,
   updateArtistAliases,
   updateArtistDisplayName,
+  updateArtistReleasesWatch,
   useArtistSearch,
   type Artist,
   type DeleteMode,
@@ -180,6 +181,16 @@ function AliasRow({
     },
   })
 
+  // 저장 버튼과 묶지 않는다 — 켜고 끄는 즉시 신보 체크 대상이 바뀌어야 한다.
+  const watch = useMutation({
+    mutationFn: (on: boolean) => updateArtistReleasesWatch(artist.id, on),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['artists'] })
+      qc.invalidateQueries({ queryKey: ['releases-status'] })
+    },
+    onError: () => toast('신보 감시 변경에 실패했습니다', 'error'),
+  })
+
   const del = useMutation({
     mutationFn: (mode: DeleteMode) => deleteArtist(artist.id, mode),
     onSuccess: ({ mode, albums }) => {
@@ -214,6 +225,16 @@ function AliasRow({
         </span>
         <span className={styles.rowId}>{artist.id}</span>
       </div>
+      <label className={styles.checkLabel} title="신보 체크 탭이 확인하는 대상인지 여부">
+        <input
+          type="checkbox"
+          className={styles.check}
+          checked={artist.releases_watch}
+          disabled={watch.isPending}
+          onChange={(e) => watch.mutate(e.target.checked)}
+        />
+        신보
+      </label>
       <input
         className={`${styles.aliasInput} ${styles.displayInput}`}
         value={name}
