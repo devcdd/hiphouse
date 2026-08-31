@@ -10,6 +10,7 @@ import { CommentSection } from '@/features/album-comments'
 import { ReportButton } from '@/features/report-album'
 import { EditDisplayNameButton } from '@/features/edit-display-name'
 import { EditAlbumInfoButton } from '@/features/edit-album-info'
+import { AwardSection } from '@/features/awards'
 import { startKakaoLogin } from '@/features/auth'
 import { apiDelete, apiPost } from '@/shared/api/client'
 import { displayName } from '@/shared/lib/displayName'
@@ -101,6 +102,8 @@ export function AlbumDetailPage() {
             </div>
           </div>
 
+          {/* 수상 경력·관리자 도구는 아트+정보 아래 한 줄 전체 */}
+          <AwardSection kind="album" id={album.id} />
           {isAdmin && <AdminCard album={album} />}
         </div>
       )}

@@ -173,6 +173,90 @@
         }
       }
     },
+    "/albums/{id}/awards": {
+      "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+      "get": {
+        "tags": ["albums"],
+        "summary": "앨범 수상 경력 목록",
+        "description": "연도 내림차순(연도 없는 항목은 뒤). 없으면 빈 배열.",
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "integer" }, "host": { "type": "string", "example": "한국힙합어워즈" }, "name": { "type": "string", "example": "올해의 앨범" }, "year": { "type": "integer", "nullable": true, "example": 2024 } } } } } } }
+        }
+      },
+      "post": {
+        "tags": ["albums"],
+        "summary": "앨범 수상 경력 추가 (관리자 전용)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["host", "name"],
+                "properties": {
+                  "host": { "type": "string", "description": "주최", "example": "한국힙합어워즈" },
+                  "name": { "type": "string", "description": "수상명", "example": "올해의 앨범" },
+                  "year": { "type": "integer", "nullable": true, "minimum": 1900, "maximum": 2100 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "추가됨", "content": { "application/json": { "schema": { "type": "object", "properties": { "id": { "type": "integer" }, "host": { "type": "string", "example": "한국힙합어워즈" }, "name": { "type": "string", "example": "올해의 앨범" }, "year": { "type": "integer", "nullable": true, "example": 2024 } } } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/artists/{id}/awards": {
+      "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+      "get": {
+        "tags": ["artists"],
+        "summary": "아티스트 수상 경력 목록",
+        "description": "연도 내림차순(연도 없는 항목은 뒤). 없으면 빈 배열.",
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "integer" }, "host": { "type": "string", "example": "한국힙합어워즈" }, "name": { "type": "string", "example": "올해의 앨범" }, "year": { "type": "integer", "nullable": true, "example": 2024 } } } } } } }
+        }
+      },
+      "post": {
+        "tags": ["artists"],
+        "summary": "아티스트 수상 경력 추가 (관리자 전용)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["host", "name"],
+                "properties": {
+                  "host": { "type": "string", "description": "주최", "example": "한국힙합어워즈" },
+                  "name": { "type": "string", "description": "수상명", "example": "올해의 앨범" },
+                  "year": { "type": "integer", "nullable": true, "minimum": 1900, "maximum": 2100 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "추가됨", "content": { "application/json": { "schema": { "type": "object", "properties": { "id": { "type": "integer" }, "host": { "type": "string", "example": "한국힙합어워즈" }, "name": { "type": "string", "example": "올해의 앨범" }, "year": { "type": "integer", "nullable": true, "example": 2024 } } } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/awards/{id}": {
+      "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+      "delete": {
+        "tags": ["albums"],
+        "summary": "수상 경력 삭제 (관리자 전용)",
+        "responses": {
+          "204": { "description": "삭제됨" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
     "/users/{id}": {
       "get": {
         "tags": ["users"],
