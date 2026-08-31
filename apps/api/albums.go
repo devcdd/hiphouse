@@ -79,6 +79,7 @@ const albumSelectCols = albumCols + `,
 	CASE WHEN album_type='album' THEN '정규'
 	     WHEN album_type='single' AND total_tracks >= 3 THEN 'EP'
 	     WHEN album_type='single' THEN '싱글'
+	     WHEN album_type='compilation' THEN '컴필레이션'
 	     ELSE album_type END AS type_label,
 	` + ratingAvgExpr + ` AS rating_avg,
 	rating_count,
