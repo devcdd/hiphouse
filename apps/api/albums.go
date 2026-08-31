@@ -58,6 +58,7 @@ type Album struct {
 	RatingCount int      `json:"rating_count" db:"rating_count"`
 	// Live (non-deleted) comment count — the number shown on album cards.
 	CommentCount int           `json:"comment_count" db:"comment_count"`
+	Awards       []Award       `json:"awards" db:"awards"` // 카드 하단 태그용, 연도 내림차순
 	DeletedAt    *string       `json:"deleted_at" db:"deleted_at"`
 	Artists      []AlbumArtist `json:"artists" db:"artists"` // aggregated from album_artists, ordered by position
 }
@@ -82,6 +83,10 @@ const albumSelectCols = albumCols + `,
 	` + ratingAvgExpr + ` AS rating_avg,
 	rating_count,
 	comment_count,
+	COALESCE((
+		SELECT json_agg(json_build_object('id', aw.id, 'host', aw.host, 'name', aw.name, 'year', aw.year) ORDER BY aw.year DESC NULLS LAST, aw.id)
+		FROM awards aw WHERE aw.album_id = albums.id
+	), '[]'::json) AS awards,
 	deleted_at::text AS deleted_at,
 	COALESCE((
 		SELECT json_agg(json_build_object('id', ar.id, 'name', ar.name, 'display_name', ar.display_name, 'image_url', ar.image_url, 'genres', ar.genres, 'spotify_url', ar.spotify_url) ORDER BY aa.position)

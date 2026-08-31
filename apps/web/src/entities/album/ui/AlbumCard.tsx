@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Star } from 'lucide-react'
 import type { Album } from '@/entities/album/model/types'
 import { displayName } from '@/shared/lib/displayName'
+import { awardHostLabel } from '@/shared/lib/awardHosts'
 import styles from './AlbumCard.module.css'
 
 export function AlbumCard({ album }: { album: Album }) {
@@ -51,6 +52,19 @@ export function AlbumCard({ album }: { album: Album }) {
             </span>
           )}
         </div>
+        {album.awards.length > 0 && (
+          <div className={styles.awards}>
+            {album.awards.map((a) => (
+              <span
+                key={a.id}
+                className={styles.award}
+                title={`${awardHostLabel(a.host)}${a.year != null ? ` · ${a.year}` : ''}`}
+              >
+                {a.name}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </article>
   )

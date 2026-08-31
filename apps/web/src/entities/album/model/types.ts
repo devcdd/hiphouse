@@ -21,6 +21,13 @@ export interface Track {
   artists: { id: string; name: string }[] // 피처링 포함, Spotify 크레딧 순서
 }
 
+export interface AlbumAward {
+  id: number
+  host: string // 주최 코드 (KHA, KMA …) — 라벨은 shared/lib/awardHosts
+  name: string
+  year: number | null
+}
+
 export interface Album {
   id: string
   name: string
@@ -38,6 +45,7 @@ export interface Album {
   rating_avg: number | null // 평균 별점 0..5 (아무도 평가 안 했으면 null)
   rating_count: number
   comment_count: number // 삭제되지 않은 댓글 수 — 카드에서 별점 옆에 노출
+  awards: AlbumAward[] // 수상 경력, 연도 내림차순 — 카드 하단 태그
 
   deleted_at: string | null // soft-delete timestamp; only admins receive deleted rows
 }

@@ -125,3 +125,23 @@
   font-weight: 600;
   color: var(--muted);
 }
+
+.awards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.award {
+  max-width: 100%;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--award-bg);
+  color: var(--award);
+  font-size: 0.66rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
