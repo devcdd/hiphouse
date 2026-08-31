@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth, updateNickname } from '@/entities/session'
+import { returnPath } from '@/features/auth'
 import { useToast } from '@/shared/ui/toast'
 import styles from './WelcomePage.module.css'
 
@@ -12,13 +13,15 @@ export function WelcomePage() {
   const qc = useQueryClient()
   const toast = useToast()
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const next = returnPath(params.get('next')) // 로그인을 시작한 페이지
   const [draft, setDraft] = useState('')
 
   const save = useMutation({
     mutationFn: updateNickname,
     onSuccess: (u) => {
       qc.setQueryData(['me'], u)
-      navigate('/', { replace: true })
+      navigate(next, { replace: true })
     },
     // 409(중복)면 서버 문구를 그대로 보여준다.
     onError: (e: Error) => toast(e.message || '닉네임 저장에 실패했습니다', 'error'),
@@ -26,7 +29,7 @@ export function WelcomePage() {
 
   if (isLoading) return <div className={styles.page} />
   if (!isAuthed) return <Navigate to="/" replace />
-  if (user?.nickname_set) return <Navigate to="/" replace />
+  if (user?.nickname_set) return <Navigate to={next} replace />
 
   const trimmed = draft.trim()
   const canSave = trimmed !== '' && !save.isPending
