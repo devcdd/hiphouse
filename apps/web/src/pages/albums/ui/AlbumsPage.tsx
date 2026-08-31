@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { YearFilter, useYears, toYearParam, ALL, type YearOption } from '@/features/filter-albums-by-year'
 import {
   TypeFilter,
+  AwardedFilter,
   SortSelect,
   toTypeParam,
   toSortParam,
@@ -23,6 +24,7 @@ export function AlbumsPage() {
   const year: YearOption = yearRaw && /^\d+$/.test(yearRaw) ? Number(yearRaw) : ALL
   const types = parseTypes(search.get('type'))
   const sort = parseSort(search.get('sort'))
+  const awarded = search.get('awarded') === '1'
 
   // "트랙 많은 순"은 싱글만 선택했을 땐 의미 없음.
   const singleOnly = types.length === 1 && types[0] === 'single'
@@ -47,8 +49,8 @@ export function AlbumsPage() {
 
   const typeParam = toTypeParam(types)
   const params = useMemo(
-    () => ({ year: toYearParam(year), albumType: typeParam, sort: toSortParam(sort) }),
-    [year, typeParam, sort],
+    () => ({ year: toYearParam(year), albumType: typeParam, sort: toSortParam(sort), awarded }),
+    [year, typeParam, sort, awarded],
   )
 
   return (
@@ -60,14 +62,17 @@ export function AlbumsPage() {
           onChange={(y) => patch({ year: y === ALL ? undefined : String(y) })}
         />
         <div className={styles.row}>
-          <TypeFilter
-            value={types}
-            onChange={(next) => {
-              // 싱글만 남으면 트랙수 정렬 무의미 → 최신순으로 되돌림.
-              const nextSingleOnly = next.length === 1 && next[0] === 'single'
-              patch({ type: toTypeParam(next), ...(nextSingleOnly && sort === 'tracks' ? { sort: undefined } : {}) })
-            }}
-          />
+          <div className={styles.group}>
+            <TypeFilter
+              value={types}
+              onChange={(next) => {
+                // 싱글만 남으면 트랙수 정렬 무의미 → 최신순으로 되돌림.
+                const nextSingleOnly = next.length === 1 && next[0] === 'single'
+                patch({ type: toTypeParam(next), ...(nextSingleOnly && sort === 'tracks' ? { sort: undefined } : {}) })
+              }}
+            />
+            <AwardedFilter value={awarded} onChange={(v) => patch({ awarded: v ? '1' : undefined })} />
+          </div>
           <SortSelect
             value={sort}
             onChange={(s) => patch({ sort: toSortParam(s) })}

@@ -9,6 +9,7 @@ export interface AlbumQuery {
   q?: string
   albumType?: string // 'single' | 'album'
   sort?: string // 'tracks' (default = recent)
+  awarded?: boolean // 수상 경력이 있는 앨범만
   deletedOnly?: boolean // admin: only soft-deleted albums (server ignores for non-admins)
 }
 
@@ -20,6 +21,7 @@ export function fetchAlbums(params: AlbumQuery & { offset: number }): Promise<Al
     q: params.q,
     type: params.albumType,
     sort: params.sort,
+    awarded: params.awarded ? '1' : undefined,
     deleted: params.deletedOnly ? 'only' : undefined,
     limit: PAGE_SIZE,
     offset: params.offset,

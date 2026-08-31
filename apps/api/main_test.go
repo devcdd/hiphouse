@@ -35,7 +35,7 @@ func TestBuildAlbumListQuery(t *testing.T) {
 	// year + artist filters present: placeholders must be $1..$4 in order.
 	y := 2024
 	// Multi-type (single OR ep): predicates inlined (no args), so placeholders stay year/artist/q + limit/offset.
-	sql, args := buildAlbumListQuery(&y, "abc", "dre", []string{"single", "ep"}, "tracks", "hide", 10, 5)
+	sql, args := buildAlbumListQuery(&y, "abc", "dre", []string{"single", "ep"}, "tracks", "hide", false, 10, 5)
 	if want := []any{2024, "abc", `\mdre`, 10, 5}; !eq(args, want) {
 		t.Fatalf("args = %v, want %v", args, want)
 	}
@@ -63,8 +63,12 @@ func TestBuildAlbumListQuery(t *testing.T) {
 	if !strings.Contains(sql, "WHERE id IN (SELECT id FROM albums") {
 		t.Errorf("expected the id-only inner query: %s", sql)
 	}
-	if strings.Count(sql, "ORDER BY total_tracks DESC") != 2 {
+	if strings.Count(sql, "total_tracks DESC") != 2 {
 		t.Errorf("both phases must carry the same ORDER BY: %s", sql)
+	}
+	// 검색어가 있으면 수상작이 먼저 — 두 단계 모두 같은 ORDER BY를 써야 한다.
+	if strings.Count(sql, "ORDER BY EXISTS (SELECT 1 FROM awards aw WHERE aw.album_id = albums.id) DESC, ") != 2 {
+		t.Errorf("search should rank awarded albums first in both phases: %s", sql)
 	}
 	// The aggregates are plain columns now — no per-row subqueries left.
 	if strings.Contains(sql, "FROM ratings") || strings.Contains(sql, "FROM comments") {
@@ -72,7 +76,7 @@ func TestBuildAlbumListQuery(t *testing.T) {
 	}
 
 	// no filters: limit/offset shift to $1/$2 (the bug this guards against), default sort by year.
-	sql, args = buildAlbumListQuery(nil, "", "", nil, "", "include", 50, 0)
+	sql, args = buildAlbumListQuery(nil, "", "", nil, "", "include", false, 50, 0)
 	if want := []any{50, 0}; !eq(args, want) {
 		t.Fatalf("args = %v, want %v", args, want)
 	}
@@ -88,8 +92,17 @@ func TestBuildAlbumListQuery(t *testing.T) {
 		t.Errorf("include mode should not filter deleted_at: %s", sql)
 	}
 
+	// 수상작 필터는 검색어 없이도 걸리고, 정렬은 건드리지 않는다.
+	sql, _ = buildAlbumListQuery(nil, "", "", nil, "", "hide", true, 50, 0)
+	if !strings.Contains(sql, "AND EXISTS (SELECT 1 FROM awards aw WHERE aw.album_id = albums.id)") {
+		t.Errorf("awarded filter missing: %s", sql)
+	}
+	if strings.Contains(sql, "albums.id) DESC") {
+		t.Errorf("no search query → no awarded boost: %s", sql)
+	}
+
 	// admin 삭제 목록 ("only") returns exclusively soft-deleted rows.
-	sql, _ = buildAlbumListQuery(nil, "", "", nil, "", "only", 50, 0)
+	sql, _ = buildAlbumListQuery(nil, "", "", nil, "", "only", false, 50, 0)
 	if !strings.Contains(sql, "albums.deleted_at IS NOT NULL") {
 		t.Errorf("only mode should filter to deleted rows: %s", sql)
 	}

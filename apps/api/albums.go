@@ -118,6 +118,10 @@ func orderClause(sort string) string {
 	}
 }
 
+// awardedExpr: 앨범에 직접 붙은 수상이 있는지 (아티스트 수상은 제외). 필터와
+// 검색 가중치 양쪽에서 쓰고, ORDER BY에 들어가므로 albums.id만 참조한다.
+const awardedExpr = "EXISTS (SELECT 1 FROM awards aw WHERE aw.album_id = albums.id)"
+
 // likeEscape neutralizes LIKE wildcards in user input so they match literally.
 var likeEscape = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 
@@ -141,12 +145,13 @@ func searchMatch(q string) (op, val string) {
 // buildAlbumListQuery is pure so it can be unit-tested without a DB.
 // deleted selects soft-delete visibility: "hide" (public), "include" (admin
 // browsing — deleted rows mixed in, dimmed client-side), "only" (admin 삭제 목록).
+// awarded는 수상 경력이 있는 앨범만 남긴다.
 //
 // Two phases on purpose: the inner query filters/sorts/paginates on plain albums
 // columns and returns ids only, the outer one runs the artists json_agg for the
 // ≤limit rows that survived. Searching a common word used to aggregate every
 // match before LIMIT threw them away.
-func buildAlbumListQuery(year *int, artistID, q string, types []string, sort string, deleted string, limit, offset int) (string, []any) {
+func buildAlbumListQuery(year *int, artistID, q string, types []string, sort string, deleted string, awarded bool, limit, offset int) (string, []any) {
 	sql := "SELECT id FROM albums WHERE 1=1"
 	// Qualified with albums. — the EXISTS subqueries have their own columns.
 	switch deleted {
@@ -190,7 +195,14 @@ func buildAlbumListQuery(year *int, artistID, q string, types []string, sort str
 	if len(conds) > 0 {
 		sql += " AND (" + strings.Join(conds, " OR ") + ")"
 	}
+	if awarded {
+		sql += " AND " + awardedExpr
+	}
 	order := orderClause(sort)
+	// 검색에선 수상작을 위로 — 이름만 스쳐 맞은 앨범보다 찾던 앨범일 확률이 높다.
+	if q != "" {
+		order = awardedExpr + " DESC, " + order
+	}
 	sql += " ORDER BY " + order
 	args = append(args, limit)
 	sql += " LIMIT $" + strconv.Itoa(len(args))
@@ -259,7 +271,7 @@ func (s *server) listAlbums(w http.ResponseWriter, r *http.Request) {
 			deleted = "include"
 		}
 	}
-	sql, args := buildAlbumListQuery(queryIntPtr(r, "year"), q.Get("artist_id"), q.Get("q"), types, q.Get("sort"), deleted, limit, offset)
+	sql, args := buildAlbumListQuery(queryIntPtr(r, "year"), q.Get("artist_id"), q.Get("q"), types, q.Get("sort"), deleted, q.Get("awarded") == "1", limit, offset)
 	rows, err := s.db.Query(r.Context(), sql, args...)
 	if err != nil {
 		writeErr(w, 500, err.Error())
