@@ -33,6 +33,9 @@
 
 .art {
   flex: 0 0 260px;
+  /* flex 기본 stretch가 .info 높이만큼 늘려서 aspect-ratio를 무시한다 — 관리자 폼이
+     열리면 세로로 길어짐. 위 정렬로 두면 높이가 auto라 항상 정사각형. */
+  align-self: flex-start;
   aspect-ratio: 1 / 1;
   max-width: 100%;
   border-radius: 12px;
