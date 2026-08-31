@@ -21,9 +21,12 @@ export function AlbumCard({ album }: { album: Album }) {
         )}
       </Link>
       <div className={styles.meta}>
-        <Link to={albumHref} className={styles.name} title={title}>
-          {title}
-        </Link>
+        <div className={styles.titleRow}>
+          <Link to={albumHref} className={styles.name} title={title}>
+            {title}
+          </Link>
+          {album.type_label && <span className={styles.badge}>{album.type_label}</span>}
+        </div>
         <div className={styles.artist} title={artistNames}>
           {album.artists.map((a, i) => (
             <Fragment key={a.id}>
