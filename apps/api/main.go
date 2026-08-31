@@ -164,6 +164,8 @@ func main() {
 	mux.HandleFunc("GET /openapi.json", serveSpec)
 	mux.HandleFunc("GET /swagger/", swaggerUI)
 
+	go s.scheduleReleaseSweep(ctx)
+
 	log.Printf("listening on :%s  (swagger: http://localhost:%s/swagger/)", port, port)
 	srv := &http.Server{Addr: ":" + port, Handler: logRequests(mux), ReadHeaderTimeout: 5 * time.Second}
 	log.Fatal(srv.ListenAndServe())

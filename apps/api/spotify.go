@@ -719,6 +719,8 @@ type releaseCheckResult struct {
 // 존재)은 되살아나지 않는다. 트랙 백필과 같은 배치 계약: Spotify 오류가 나면
 // 멈추고 부분 진행을 보고하며, 실패한 아티스트는 스탬프가 안 찍혀 다음 호출이
 // 다시 집는다. 아티스트 자체가 Spotify에서 사라진 404는 스탬프만 찍고 넘어간다.
+// POST /admin/spotify/check-releases {key, limit} — 한 배치를 실행해 결과를 돌려준다.
+// 실제 로직은 checkReleasesBatch (서버 자체 스윕도 같은 함수를 쓴다).
 func (s *server) adminCheckReleases(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Key   string `json:"key"`
@@ -727,17 +729,33 @@ func (s *server) adminCheckReleases(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &body) {
 		return
 	}
-	if body.Limit < 1 || body.Limit > 50 {
-		body.Limit = 10
-	}
-	market := env("MARKET", "KR")
-
-	rows, err := s.db.Query(r.Context(),
-		"SELECT a.id, COALESCE(a.display_name, a.name) "+releaseStaleSQL+
-			" ORDER BY a.releases_checked_at NULLS FIRST, a.id LIMIT $1", body.Limit)
+	res, err := s.checkReleasesBatch(r.Context(), body.Key, body.Limit)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
+	}
+	writeJSON(w, 200, res)
+}
+
+// checkReleasesBatch — DB 보유 아티스트를 오래 안 본 순서대로 limit명 골라 신보를
+// 감지한다. 아티스트당 Spotify 요청 1회: 앨범 목록 첫 페이지(최신순 10장)만 본다 —
+// 한 주기에 10장 넘게 내는 아티스트는 없다. DB에 행이 아예 없는 앨범만 저장하므로
+// 관리자가 삭제한 앨범(soft-delete 행 존재)은 되살아나지 않는다. 트랙 백필과 같은
+// 배치 계약: Spotify 오류가 나면 멈추고 부분 진행을 res.Error로 보고하며, 실패한
+// 아티스트는 스탬프가 안 찍혀 다음 호출이 다시 집는다. 아티스트 자체가 Spotify에서
+// 사라진 404는 스탬프만 찍고 넘어간다. 반환 error는 DB 장애(= HTTP 500)만.
+func (s *server) checkReleasesBatch(ctx context.Context, key string, limit int) (releaseCheckResult, error) {
+	res := releaseCheckResult{Artists: []releaseCheckItem{}}
+	if limit < 1 || limit > 50 {
+		limit = 10
+	}
+	market := env("MARKET", "KR")
+
+	rows, err := s.db.Query(ctx,
+		"SELECT a.id, COALESCE(a.display_name, a.name) "+releaseStaleSQL+
+			" ORDER BY a.releases_checked_at NULLS FIRST, a.id LIMIT $1", limit)
+	if err != nil {
+		return res, err
 	}
 	type candidate struct {
 		ID   string
@@ -745,11 +763,9 @@ func (s *server) adminCheckReleases(w http.ResponseWriter, r *http.Request) {
 	}
 	pending, err := pgx.CollectRows(rows, pgx.RowToStructByPos[candidate])
 	if err != nil {
-		writeErr(w, 500, err.Error())
-		return
+		return res, err
 	}
 
-	res := releaseCheckResult{Artists: []releaseCheckItem{}}
 	credited := map[string]bool{}
 	var newAlbumIDs []string
 	for _, ar := range pending {
@@ -757,7 +773,7 @@ func (s *server) adminCheckReleases(w http.ResponseWriter, r *http.Request) {
 			Items []spAlbum `json:"items"`
 		}
 		u := spAPI + "/artists/" + url.PathEscape(ar.ID) + "/albums?include_groups=album,single&market=" + url.QueryEscape(market) + "&limit=10"
-		if err := s.spGet(r.Context(), body.Key, u, &page); err != nil {
+		if err := s.spGet(ctx, key, u, &page); err != nil {
 			var se *spError
 			if !errors.As(err, &se) || se.Status != 404 {
 				name := ar.ID
@@ -776,15 +792,13 @@ func (s *server) adminCheckReleases(w http.ResponseWriter, r *http.Request) {
 		}
 		existing := map[string]bool{}
 		if len(ids) > 0 {
-			erows, err := s.db.Query(r.Context(), "SELECT id FROM albums WHERE id = ANY($1)", ids)
+			erows, err := s.db.Query(ctx, "SELECT id FROM albums WHERE id = ANY($1)", ids)
 			if err != nil {
-				writeErr(w, 500, err.Error())
-				return
+				return res, err
 			}
 			got, err := pgx.CollectRows(erows, pgx.RowTo[string])
 			if err != nil {
-				writeErr(w, 500, err.Error())
-				return
+				return res, err
 			}
 			for _, id := range got {
 				existing[id] = true
@@ -798,20 +812,17 @@ func (s *server) adminCheckReleases(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if len(fresh) > 0 {
-			tx, err := s.db.Begin(r.Context())
+			tx, err := s.db.Begin(ctx)
 			if err != nil {
-				writeErr(w, 500, err.Error())
-				return
+				return res, err
 			}
-			cr, err := upsertAlbums(r.Context(), tx, fresh)
+			cr, err := upsertAlbums(ctx, tx, fresh)
 			if err != nil {
-				tx.Rollback(r.Context())
-				writeErr(w, 500, err.Error())
-				return
+				tx.Rollback(ctx)
+				return res, err
 			}
-			if err := tx.Commit(r.Context()); err != nil {
-				writeErr(w, 500, err.Error())
-				return
+			if err := tx.Commit(ctx); err != nil {
+				return res, err
 			}
 			for id := range cr {
 				credited[id] = true
@@ -825,23 +836,21 @@ func (s *server) adminCheckReleases(w http.ResponseWriter, r *http.Request) {
 			res.NewAlbums += len(fresh)
 		}
 
-		if _, err := s.db.Exec(r.Context(), "UPDATE artists SET releases_checked_at=now() WHERE id=$1", ar.ID); err != nil {
-			writeErr(w, 500, err.Error())
-			return
+		if _, err := s.db.Exec(ctx, "UPDATE artists SET releases_checked_at=now() WHERE id=$1", ar.ID); err != nil {
+			return res, err
 		}
 		res.Checked++
 	}
 
 	if len(credited) > 0 {
-		res.Enriched = s.enrichCredited(r.Context(), body.Key, credited)
+		res.Enriched = s.enrichCredited(ctx, key, credited)
 	}
 	if len(newAlbumIDs) > 0 {
-		res.TracksSynced = s.syncNewAlbumTracks(r.Context(), body.Key, market, newAlbumIDs)
+		res.TracksSynced = s.syncNewAlbumTracks(ctx, key, market, newAlbumIDs)
 	}
 
-	if err := s.db.QueryRow(r.Context(), "SELECT COUNT(*)::int "+releaseStaleSQL).Scan(&res.Remaining); err != nil {
-		writeErr(w, 500, err.Error())
-		return
+	if err := s.db.QueryRow(ctx, "SELECT COUNT(*)::int "+releaseStaleSQL).Scan(&res.Remaining); err != nil {
+		return res, err
 	}
-	writeJSON(w, 200, res)
+	return res, nil
 }
