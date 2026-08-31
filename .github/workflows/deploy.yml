@@ -31,7 +31,8 @@ jobs:
 
   build-push:
     needs: test
-    runs-on: ubuntu-latest
+    # 서버가 t4g(arm64)라 arm 러너에서 네이티브 빌드 — QEMU 에뮬레이션 없이.
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         include:
@@ -65,6 +66,7 @@ jobs:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
           push: true
+          platforms: linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
@@ -74,8 +76,8 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
 
-  # Runs ON the server via the self-hosted runner (name: hip-house) — no SSH needed.
-  # DEPLOY_PATH must already contain .env (see .env.example). Defaults to /root/hiphouse.
+  # Runs ON the server via the self-hosted runner (name: hiphouse, user: ubuntu) — no SSH needed.
+  # DEPLOY_PATH (repo variable) must already contain .env (see .env.example).
   deploy:
     needs: build-push
     runs-on: self-hosted
