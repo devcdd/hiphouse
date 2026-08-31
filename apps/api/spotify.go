@@ -351,7 +351,8 @@ func upsertAlbums(ctx context.Context, tx pgx.Tx, albums []spAlbum) (map[string]
 			   image_url=EXCLUDED.image_url, spotify_url=EXCLUDED.spotify_url,
 			   upc=COALESCE(EXCLUDED.upc, albums.upc),
 			   copyrights=COALESCE(EXCLUDED.copyrights, albums.copyrights),
-			   release_date_precision=COALESCE(EXCLUDED.release_date_precision, albums.release_date_precision)`,
+			   release_date_precision=COALESCE(EXCLUDED.release_date_precision, albums.release_date_precision)
+			 WHERE albums.info_edited_at IS NULL`,
 			al.ID, al.Name, strPtr(al.ReleaseDate), yearOf(al.ReleaseDate), strPtr(al.AlbumType),
 			al.TotalTracks, img, strPtr(al.ExternalURLs.Spotify),
 			strPtr(al.ExternalIDs.UPC), copyrightsJSON(al.Copyrights), strPtr(al.ReleaseDatePrecision)); err != nil {

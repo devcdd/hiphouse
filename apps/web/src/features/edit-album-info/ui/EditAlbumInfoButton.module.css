@@ -17,21 +17,40 @@
 }
 
 .form {
-  display: inline-flex;
-  align-items: center;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
   gap: 6px;
-  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* 원제는 길어서 한 줄 전체 */
+.fieldWide {
+  grid-column: 1 / -1;
+}
+
+.field span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--muted);
 }
 
 .input {
   min-width: 0;
-  width: 200px;
-  padding: 8px 14px;
+  width: 100%;
+  padding: 9px 12px;
   border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
-  border-radius: 999px;
+  border-radius: 10px;
   background: var(--bg);
   color: var(--fg);
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   transition: border-color 0.12s;
 }
 
@@ -45,8 +64,18 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--fg) 14%, transparent);
 }
 
+.actions {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
 .save {
-  padding: 8px 16px;
+  padding: 8px 18px;
   border: none;
   border-radius: 999px;
   background: var(--fg);
@@ -62,8 +91,9 @@
 }
 
 .cancel {
-  padding: 8px 12px;
-  border: none;
+  padding: 8px 14px;
+  border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
+  border-radius: 999px;
   background: none;
   color: var(--muted);
   font-size: 0.8rem;
@@ -71,19 +101,12 @@
   cursor: pointer;
 }
 
-.error {
-  color: #e5484d;
-  font-size: 0.8rem;
+.cancel:hover {
+  color: var(--fg);
 }
 
-/* 좁은 화면: 고정폭 입력칸이 줄을 밀어낸다 — 남는 폭을 그대로 쓰게. */
-@media (max-width: 600px) {
-  .form {
-    width: 100%;
-  }
-
-  .input {
-    flex: 1 1 120px;
-    width: auto;
-  }
+.error {
+  margin-right: auto;
+  color: #e5484d;
+  font-size: 0.8rem;
 }

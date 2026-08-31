@@ -413,6 +413,12 @@ func (s *server) mergeArtists(w http.ResponseWriter, r *http.Request) {
 		aliases = kept
 	}
 
+	// 수상 경력은 병합 대상이 삭제되면 FK CASCADE로 사라지므로 먼저 master로 옮긴다.
+	if _, err := tx.Exec(r.Context(), "UPDATE awards SET artist_id=$1 WHERE artist_id = ANY($2)", body.MasterID, merged); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+
 	// Move credits one duplicate at a time: the guard skips albums where the
 	// master is already credited, and the leftover duplicate rows are dropped.
 	for _, id := range merged {

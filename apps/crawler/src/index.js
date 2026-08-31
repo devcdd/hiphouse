@@ -187,7 +187,8 @@ const upsertAlbumRow = (db, r) =>
      VALUES($1,$2,$3,$4,$5,$6,$7,$8)
      ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,
        release_date=EXCLUDED.release_date, year=EXCLUDED.year, album_type=EXCLUDED.album_type,
-       total_tracks=EXCLUDED.total_tracks, image_url=EXCLUDED.image_url, spotify_url=EXCLUDED.spotify_url`,
+       total_tracks=EXCLUDED.total_tracks, image_url=EXCLUDED.image_url, spotify_url=EXCLUDED.spotify_url
+     WHERE albums.info_edited_at IS NULL`,
     [r.id, r.name, r.release_date, r.year, r.album_type, r.total_tracks, r.image_url, r.spotify_url]
   );
 

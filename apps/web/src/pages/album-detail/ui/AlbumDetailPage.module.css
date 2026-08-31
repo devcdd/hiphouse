@@ -33,6 +33,9 @@
 
 .art {
   flex: 0 0 260px;
+  /* flex 기본 stretch가 .info 높이만큼 늘려서 aspect-ratio를 무시한다 — 관리자 폼이
+     열리면 세로로 길어짐. 위 정렬로 두면 높이가 auto라 항상 정사각형. */
+  align-self: flex-start;
   aspect-ratio: 1 / 1;
   max-width: 100%;
   border-radius: 12px;
@@ -142,24 +145,33 @@
   gap: 2px;
 }
 
-/* 관리자 전용 도구 묶음 — 일반 사용자에겐 렌더되지 않는다. */
-.adminBar {
-  margin-top: 12px;
+/* 관리자 전용 도구 카드 — 일반 사용자에겐 렌더되지 않는다. */
+.adminCard {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px 16px;
+  border: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
+}
+
+.adminHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.adminTools {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--fg) 6%, transparent);
-}
-
-.adminTag {
-  flex: none;
-  font-size: 0.7rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  color: var(--muted);
 }
 
 .loginHint {
@@ -173,21 +185,28 @@
   cursor: pointer;
 }
 
+/* 파괴적 액션은 편집 도구와 떨어뜨려 우측 끝에 */
 .delete,
 .restore {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 9px 16px;
+  margin-left: auto;
+  padding: 8px 14px;
   border: none;
   border-radius: 999px;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 700;
   cursor: pointer;
 }
 
 .delete {
-  background: #ff4d6d;
+  background: color-mix(in srgb, #e5484d 12%, transparent);
+  color: #e5484d;
+}
+
+.delete:hover {
+  background: #e5484d;
   color: #fff;
 }
 
@@ -339,14 +358,10 @@
 
   /* 버튼만 늘린다 — RatingControl이 함께 렌더하는 <dialog>는 건드리지 않게. */
   .actions > button,
-  .adminBar > button,
-  .adminBar > form {
+  .adminTools > button,
+  .adminTools > form {
     flex: 1 1 132px;
     justify-content: center;
-  }
-
-  .adminTag {
-    flex-basis: 100%;
   }
 
   .embed {
