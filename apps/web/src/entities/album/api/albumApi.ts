@@ -35,6 +35,18 @@ export function updateAlbumDisplayName(id: string, displayName: string): Promise
   return apiPut<void>(`/albums/${encodeURIComponent(id)}/display-name`, { display_name: displayName })
 }
 
+export interface AlbumInfoPatch {
+  name: string
+  release_date: string | null // YYYY | YYYY-MM | YYYY-MM-DD
+  album_type: string | null // album | single | compilation
+  total_tracks: number | null
+}
+
+// Admin: Spotify 메타 교정. 저장 후엔 재동기화가 이 앨범을 덮어쓰지 않는다.
+export function updateAlbumInfo(id: string, body: AlbumInfoPatch): Promise<void> {
+  return apiPut<void>(`/albums/${encodeURIComponent(id)}/info`, body)
+}
+
 // disc/track 순 정렬. 아직 동기화 전인 앨범은 빈 배열.
 export function fetchAlbumTracks(albumId: string): Promise<Track[]> {
   return apiGet<Track[]>(`/albums/${encodeURIComponent(albumId)}/tracks`)

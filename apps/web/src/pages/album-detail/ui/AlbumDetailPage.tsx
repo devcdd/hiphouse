@@ -9,6 +9,7 @@ import { RatingControl, StarRating, useRatingMap } from '@/features/rate-album'
 import { CommentSection } from '@/features/album-comments'
 import { ReportButton } from '@/features/report-album'
 import { EditDisplayNameButton } from '@/features/edit-display-name'
+import { EditAlbumInfoButton } from '@/features/edit-album-info'
 import { startKakaoLogin } from '@/features/auth'
 import { apiDelete, apiPost } from '@/shared/api/client'
 import { displayName } from '@/shared/lib/displayName'
@@ -104,29 +105,30 @@ export function AlbumDetailPage() {
               )}
             </div>
 
-            {/* 관리자 도구는 별도 줄 — 일반 액션과 섞이면 좁은 화면에서 줄이 터진다. */}
-            {isAdmin && (
-              <div className={styles.adminBar}>
-                <span className={styles.adminTag}>관리자</span>
-                <EditDisplayNameButton kind="album" id={album.id} name={album.name} displayName={album.display_name} />
-                <button
-                  type="button"
-                  className={album.deleted_at ? styles.restore : styles.delete}
-                  disabled={toggleDelete.isPending}
-                  onClick={() => toggleDelete.mutate(!!album.deleted_at)}
-                >
-                  {album.deleted_at ? <RotateCcw size={15} strokeWidth={2.4} /> : <Trash2 size={15} strokeWidth={2.4} />}
-                  {album.deleted_at ? '복구' : '삭제'}
-                </button>
-              </div>
-            )}
-
             {/* 별도 줄: 주요 액션보다 눈에 덜 띄게 */}
             <div className={styles.report}>
               <ReportButton albumId={album.id} kind="rename" />
               <ReportButton albumId={album.id} kind="not-hiphop" />
             </div>
           </div>
+
+          {/* 관리자 도구는 아트+정보 아래 한 줄 전체 — 정보 컬럼 안에 두면 폼이 열릴 때 좁다. */}
+          {isAdmin && (
+            <div className={styles.adminBar}>
+              <span className={styles.adminTag}>관리자</span>
+              <EditDisplayNameButton kind="album" id={album.id} name={album.name} displayName={album.display_name} />
+              <EditAlbumInfoButton album={album} />
+              <button
+                type="button"
+                className={album.deleted_at ? styles.restore : styles.delete}
+                disabled={toggleDelete.isPending}
+                onClick={() => toggleDelete.mutate(!!album.deleted_at)}
+              >
+                {album.deleted_at ? <RotateCcw size={15} strokeWidth={2.4} /> : <Trash2 size={15} strokeWidth={2.4} />}
+                {album.deleted_at ? '복구' : '삭제'}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

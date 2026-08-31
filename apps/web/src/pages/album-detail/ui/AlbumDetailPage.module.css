@@ -147,7 +147,7 @@
 
 /* 관리자 전용 도구 묶음 — 일반 사용자에겐 렌더되지 않는다. */
 .adminBar {
-  margin-top: 12px;
+  flex-basis: 100%;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
