@@ -25,18 +25,24 @@
 
 .input {
   min-width: 0;
-  width: 180px;
+  width: 200px;
   padding: 8px 14px;
-  border: none;
+  border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
   border-radius: 999px;
-  background: var(--surface);
+  background: var(--bg);
   color: var(--fg);
   font-size: 0.85rem;
+  transition: border-color 0.12s;
+}
+
+.input:hover {
+  border-color: color-mix(in srgb, var(--fg) 28%, transparent);
 }
 
 .input:focus {
-  outline: 2px solid var(--muted);
-  outline-offset: -1px;
+  outline: none;
+  border-color: var(--fg);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--fg) 14%, transparent);
 }
 
 .save {
