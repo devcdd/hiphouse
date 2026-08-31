@@ -118,6 +118,7 @@ func main() {
 	mux.HandleFunc("PUT /albums/{id}/tracks/{trackId}/display-name", s.requireAdmin(s.updateTrackDisplayName))
 	mux.HandleFunc("PUT /albums/{id}", s.requireAdmin(s.updateAlbum))
 	mux.HandleFunc("PUT /albums/{id}/display-name", s.requireAdmin(s.updateAlbumDisplayName))
+	mux.HandleFunc("PUT /albums/{id}/info", s.requireAdmin(s.updateAlbumInfo))
 	mux.HandleFunc("DELETE /albums/{id}", s.requireAdmin(s.deleteAlbum))
 	mux.HandleFunc("POST /albums/{id}/restore", s.requireAdmin(s.restoreAlbum))
 
@@ -327,6 +328,9 @@ func (s *server) ensureAuthSchema(ctx context.Context) error {
 		-- returns the label-registered, usually English, name).
 		ALTER TABLE IF EXISTS artists ADD COLUMN IF NOT EXISTS display_name TEXT;
 		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS display_name TEXT;
+		-- 관리자가 원제/발매일/유형/트랙 수를 손본 시각. Spotify 발매일이 실제와 다른
+		-- 앨범이 있어서 두는데, NOT NULL이면 재동기화·크롤러 upsert가 그 행을 건너뛴다.
+		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS info_edited_at TIMESTAMPTZ;
 
 		-- Denormalized aggregates on albums. The list query sorts by these, so as
 		-- correlated subqueries they were computed for every matching row before

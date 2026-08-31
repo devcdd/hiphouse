@@ -387,6 +387,55 @@ func (s *server) updateAlbum(w http.ResponseWriter, r *http.Request) {
 // updateAlbumDisplayName replaces only the 한글 표시 이름 (admin-only). Crawler-owned
 // fields are untouched, and a blank value clears the override so the UI falls back
 // to Spotify's name.
+var releaseDateRe = regexp.MustCompile(`^\d{4}(-\d{2}(-\d{2})?)?$`)
+
+// 관리자가 Spotify 메타를 바로잡는 창구. 저장 시 info_edited_at이 찍혀 이후
+// 재동기화가 이 행을 덮어쓰지 않는다 (upsertAlbums의 WHERE 참고).
+func (s *server) updateAlbumInfo(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Name        string  `json:"name"`
+		ReleaseDate *string `json:"release_date"`
+		AlbumType   *string `json:"album_type"`
+		TotalTracks *int    `json:"total_tracks"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	body.Name = strings.TrimSpace(body.Name)
+	rd, at := nilIfBlank(body.ReleaseDate), nilIfBlank(body.AlbumType)
+	switch {
+	case body.Name == "":
+		writeErr(w, 400, "name is required")
+		return
+	case rd != nil && !releaseDateRe.MatchString(*rd):
+		writeErr(w, 400, "release_date must be YYYY, YYYY-MM or YYYY-MM-DD")
+		return
+	case at != nil && *at != "album" && *at != "single" && *at != "compilation":
+		writeErr(w, 400, "album_type must be album, single or compilation")
+		return
+	case body.TotalTracks != nil && *body.TotalTracks < 1:
+		writeErr(w, 400, "total_tracks must be positive")
+		return
+	}
+	var year *int
+	if rd != nil {
+		year = yearOf(*rd)
+	}
+	tag, err := s.db.Exec(r.Context(),
+		`UPDATE albums SET name=$2, release_date=$3, year=$4, album_type=$5, total_tracks=$6, info_edited_at=now()
+		 WHERE id=$1`,
+		r.PathValue("id"), body.Name, rd, year, at, body.TotalTracks)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		writeErr(w, 404, "album not found")
+		return
+	}
+	w.WriteHeader(204)
+}
+
 func (s *server) updateAlbumDisplayName(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		DisplayName *string `json:"display_name"`

@@ -1,0 +1,97 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn:hover {
+  color: var(--fg);
+}
+
+/* 관리자 바(flex-wrap) 안에서 항상 제 줄을 차지한다 — 4개 필드가 한 줄에 안 들어간다.
+   min-width: 페이지 CSS의 모바일 규칙(.adminBar > form { flex: 1 1 132px })이 basis를
+   덮어써도 한 줄 전체를 지키게. */
+.form {
+  flex-basis: 100%;
+  min-width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field span {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.input {
+  min-width: 0;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 0.85rem;
+}
+
+.input:focus {
+  outline: 2px solid var(--muted);
+  outline-offset: -1px;
+}
+
+.actions {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.save {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 999px;
+  background: var(--fg);
+  color: var(--bg);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.save:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.cancel {
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.error {
+  color: #e5484d;
+  font-size: 0.8rem;
+}
