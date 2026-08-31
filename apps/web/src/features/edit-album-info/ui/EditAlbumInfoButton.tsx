@@ -21,10 +21,20 @@ const toForm = (a: Album) => ({
 
 // 관리자 전용 메타 편집. Spotify 발매일이 실제와 다른 앨범이 있어 원제/발매일/
 // 유형/트랙 수를 직접 고친다. 저장 후엔 서버가 재동기화 덮어쓰기를 막아준다.
-export function EditAlbumInfoButton({ album }: { album: Album }) {
+export function EditAlbumInfoButton({
+  album,
+  onEditingChange,
+}: {
+  album: Album
+  onEditingChange?: (editing: boolean) => void // 부모가 폼 열림 동안 다른 도구를 숨기는 용도
+}) {
   const { isAdmin } = useAuth()
   const qc = useQueryClient()
-  const [editing, setEditing] = useState(false)
+  const [editing, setEditingState] = useState(false)
+  const setEditing = (v: boolean) => {
+    setEditingState(v)
+    onEditingChange?.(v)
+  }
   const [form, setForm] = useState(() => toForm(album))
   const set = (k: keyof ReturnType<typeof toForm>) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [k]: e.target.value }))
@@ -69,7 +79,7 @@ export function EditAlbumInfoButton({ album }: { album: Album }) {
         save.mutate()
       }}
     >
-      <label className={styles.field}>
+      <label className={`${styles.field} ${styles.fieldWide}`}>
         <span>원제</span>
         <input className={styles.input} value={form.name} onChange={set('name')} required autoFocus />
       </label>
@@ -107,13 +117,13 @@ export function EditAlbumInfoButton({ album }: { album: Album }) {
         />
       </label>
       <div className={styles.actions}>
-        <button type="submit" className={styles.save} disabled={save.isPending}>
-          {save.isPending ? '저장 중…' : '저장'}
-        </button>
+        {save.isError && <span className={styles.error}>{save.error.message}</span>}
         <button type="button" className={styles.cancel} onClick={() => setEditing(false)}>
           취소
         </button>
-        {save.isError && <span className={styles.error}>{save.error.message}</span>}
+        <button type="submit" className={styles.save} disabled={save.isPending}>
+          {save.isPending ? '저장 중…' : '저장'}
+        </button>
       </div>
     </form>
   )

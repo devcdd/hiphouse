@@ -1,8 +1,8 @@
 import { Fragment, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, RotateCcw, Trash2 } from 'lucide-react'
-import { useAlbum } from '@/entities/album'
+import { ArrowLeft, RotateCcw, ShieldCheck, Trash2 } from 'lucide-react'
+import { useAlbum, type Album } from '@/entities/album'
 import { useAuth } from '@/entities/session'
 import { FavoriteButton, useFavoriteIds } from '@/features/favorite-album'
 import { RatingControl, StarRating, useRatingMap } from '@/features/rate-album'
@@ -20,23 +20,12 @@ import styles from './AlbumDetailPage.module.css'
 export function AlbumDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
-  const qc = useQueryClient()
   const { data: album, isLoading: loading, error } = useAlbum(id)
   const { isAuthed, isAdmin } = useAuth()
   const favIds = useFavoriteIds(isAuthed)
   const ratings = useRatingMap(isAuthed)
   // 트랙리스트는 기본 접힘 — 펼칠 때 처음 fetch (useAlbumTracks enabled).
   const [tracksOpen, setTracksOpen] = useState(false)
-
-  // Admin soft-delete / restore.
-  const toggleDelete = useMutation({
-    mutationFn: (deleted: boolean) =>
-      deleted ? apiPost(`/albums/${encodeURIComponent(id)}/restore`) : apiDelete(`/albums/${encodeURIComponent(id)}`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['album', id] })
-      qc.invalidateQueries({ queryKey: ['albums'] })
-    },
-  })
 
   return (
     <div className={styles.page}>
@@ -112,23 +101,7 @@ export function AlbumDetailPage() {
             </div>
           </div>
 
-          {/* 관리자 도구는 아트+정보 아래 한 줄 전체 — 정보 컬럼 안에 두면 폼이 열릴 때 좁다. */}
-          {isAdmin && (
-            <div className={styles.adminBar}>
-              <span className={styles.adminTag}>관리자</span>
-              <EditDisplayNameButton kind="album" id={album.id} name={album.name} displayName={album.display_name} />
-              <EditAlbumInfoButton album={album} />
-              <button
-                type="button"
-                className={album.deleted_at ? styles.restore : styles.delete}
-                disabled={toggleDelete.isPending}
-                onClick={() => toggleDelete.mutate(!!album.deleted_at)}
-              >
-                {album.deleted_at ? <RotateCcw size={15} strokeWidth={2.4} /> : <Trash2 size={15} strokeWidth={2.4} />}
-                {album.deleted_at ? '복구' : '삭제'}
-              </button>
-            </div>
-          )}
+          {isAdmin && <AdminCard album={album} />}
         </div>
       )}
 
@@ -154,6 +127,50 @@ export function AlbumDetailPage() {
       )}
 
       {album && <CommentSection albumId={album.id} />}
+    </div>
+  )
+}
+
+// 관리자 도구는 아트+정보 아래 한 줄 전체 — 정보 컬럼 안에 두면 폼이 열릴 때 좁다.
+// 앨범과 함께 마운트/언마운트되므로 편집 상태가 다른 앨범으로 새지 않는다.
+function AdminCard({ album }: { album: Album }) {
+  const qc = useQueryClient()
+  const [infoEditing, setInfoEditing] = useState(false)
+
+  const toggleDelete = useMutation({
+    mutationFn: (deleted: boolean) =>
+      deleted
+        ? apiPost(`/albums/${encodeURIComponent(album.id)}/restore`)
+        : apiDelete(`/albums/${encodeURIComponent(album.id)}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['album', album.id] })
+      qc.invalidateQueries({ queryKey: ['albums'] })
+    },
+  })
+
+  return (
+    <div className={styles.adminCard}>
+      <div className={styles.adminHead}>
+        <ShieldCheck size={13} strokeWidth={2.4} />
+        관리자 도구
+      </div>
+      <div className={styles.adminTools}>
+        {!infoEditing && (
+          <EditDisplayNameButton kind="album" id={album.id} name={album.name} displayName={album.display_name} />
+        )}
+        <EditAlbumInfoButton album={album} onEditingChange={setInfoEditing} />
+        {!infoEditing && (
+          <button
+            type="button"
+            className={album.deleted_at ? styles.restore : styles.delete}
+            disabled={toggleDelete.isPending}
+            onClick={() => toggleDelete.mutate(!!album.deleted_at)}
+          >
+            {album.deleted_at ? <RotateCcw size={14} strokeWidth={2.4} /> : <Trash2 size={14} strokeWidth={2.4} />}
+            {album.deleted_at ? '복구' : '삭제'}
+          </button>
+        )}
+      </div>
     </div>
   )
 }
