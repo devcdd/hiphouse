@@ -6,6 +6,7 @@ import { FollowButton } from '@/features/follow-artist'
 import { RefreshAlbumsButton } from '@/features/crawl-artist'
 import { EditDisplayNameButton } from '@/features/edit-display-name'
 import { WatchReleasesButton } from '@/features/watch-releases'
+import { AwardSection } from '@/features/awards'
 import { Avatar } from '@/shared/ui/Avatar'
 import { displayName } from '@/shared/lib/displayName'
 import styles from './ArtistDetailPage.module.css'
@@ -47,6 +48,8 @@ export function ArtistDetailPage() {
           <WatchReleasesButton artistId={artist.id} watching={artist.releases_watch} />
         </div>
       )}
+
+      {artist && <AwardSection kind="artist" id={artist.id} />}
 
       {error && <p className={styles.state}>불러오기 실패: {String(error)}</p>}
       <AlbumFeed params={{ artistId: id }} />

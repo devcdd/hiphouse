@@ -48,7 +48,28 @@
   min-width: 0;
 }
 
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.badge {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  background: var(--surface);
+  user-select: none;
+}
+
 .name {
+  flex: 1;
+  min-width: 0;
   font-size: 0.9rem;
   font-weight: 600;
   white-space: nowrap;
@@ -103,4 +124,24 @@
 .count {
   font-weight: 600;
   color: var(--muted);
+}
+
+.awards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.award {
+  max-width: 100%;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--award-bg);
+  color: var(--award);
+  font-size: 0.66rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

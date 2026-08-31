@@ -118,6 +118,9 @@ func main() {
 	mux.HandleFunc("PUT /albums/{id}/tracks/{trackId}/display-name", s.requireAdmin(s.updateTrackDisplayName))
 	mux.HandleFunc("PUT /albums/{id}", s.requireAdmin(s.updateAlbum))
 	mux.HandleFunc("PUT /albums/{id}/display-name", s.requireAdmin(s.updateAlbumDisplayName))
+	mux.HandleFunc("PUT /albums/{id}/info", s.requireAdmin(s.updateAlbumInfo))
+	mux.HandleFunc("GET /albums/{id}/awards", s.listAwards("album_id"))
+	mux.HandleFunc("POST /albums/{id}/awards", s.requireAdmin(s.addAward("album_id")))
 	mux.HandleFunc("DELETE /albums/{id}", s.requireAdmin(s.deleteAlbum))
 	mux.HandleFunc("POST /albums/{id}/restore", s.requireAdmin(s.restoreAlbum))
 
@@ -129,6 +132,9 @@ func main() {
 	mux.HandleFunc("PUT /artists/{id}/aliases", s.requireAdmin(s.updateArtistAliases))
 	mux.HandleFunc("PUT /artists/{id}/display-name", s.requireAdmin(s.updateArtistDisplayName))
 	mux.HandleFunc("PUT /artists/{id}/releases-watch", s.requireAdmin(s.updateArtistReleasesWatch))
+	mux.HandleFunc("GET /artists/{id}/awards", s.listAwards("artist_id"))
+	mux.HandleFunc("POST /artists/{id}/awards", s.requireAdmin(s.addAward("artist_id")))
+	mux.HandleFunc("DELETE /awards/{id}", s.requireAdmin(s.deleteAward))
 	mux.HandleFunc("POST /artists/merge", s.requireAdmin(s.mergeArtists))
 	mux.HandleFunc("DELETE /artists/{id}", s.requireAdmin(s.deleteArtist))
 
@@ -327,6 +333,24 @@ func (s *server) ensureAuthSchema(ctx context.Context) error {
 		-- returns the label-registered, usually English, name).
 		ALTER TABLE IF EXISTS artists ADD COLUMN IF NOT EXISTS display_name TEXT;
 		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS display_name TEXT;
+		-- 관리자가 원제/발매일/유형/트랙 수를 손본 시각. Spotify 발매일이 실제와 다른
+		-- 앨범이 있어서 두는데, NOT NULL이면 재동기화·크롤러 upsert가 그 행을 건너뛴다.
+		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS info_edited_at TIMESTAMPTZ;
+
+		-- 수상 경력 (관리자 입력). 앨범 또는 아티스트 중 정확히 하나에 붙는다.
+		-- FK CASCADE: 앨범/아티스트 hard delete·병합 삭제 때 같이 사라진다 (병합은 먼저 재지정).
+		CREATE TABLE IF NOT EXISTS awards (
+			id BIGSERIAL PRIMARY KEY,
+			album_id TEXT REFERENCES albums(id) ON DELETE CASCADE,
+			artist_id TEXT REFERENCES artists(id) ON DELETE CASCADE,
+			host TEXT NOT NULL,
+			name TEXT NOT NULL,
+			year INTEGER,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			CHECK ((album_id IS NULL) <> (artist_id IS NULL))
+		);
+		CREATE INDEX IF NOT EXISTS idx_awards_album ON awards(album_id);
+		CREATE INDEX IF NOT EXISTS idx_awards_artist ON awards(artist_id);
 
 		-- Denormalized aggregates on albums. The list query sorts by these, so as
 		-- correlated subqueries they were computed for every matching row before

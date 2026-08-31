@@ -7,6 +7,7 @@
     "dev": "docker compose up -d --wait db && concurrently -k -n api,web -c cyan,magenta \"pnpm dev:api\" \"pnpm dev:web\"",
     "dev:api": "cd apps/api && go tool wgo run .",
     "dev:web": "pnpm --filter @hiphouse/web dev",
+    "dev:web:prod": "API_PROXY=https://hiphouse.kr/api pnpm dev:web",
     "crawl": "pnpm --filter @hiphouse/crawler crawl",
     "search": "pnpm --filter @hiphouse/crawler search",
     "artist": "pnpm --filter @hiphouse/crawler search",

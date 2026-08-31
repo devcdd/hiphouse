@@ -143,6 +143,120 @@
         }
       }
     },
+    "/albums/{id}/info": {
+      "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+      "put": {
+        "tags": ["albums"],
+        "summary": "앨범 메타(원제/발매일/유형/트랙 수) 수정 (관리자 전용)",
+        "description": "Spotify 발매일이 실제와 다른 앨범을 바로잡는 용도. 저장하면 info_edited_at이 찍혀 이후 Spotify 재동기화·크롤러가 이 앨범 행을 덮어쓰지 않는다. year는 release_date 앞 4자리에서 자동 산출. release_date/album_type을 비우면 null.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": { "type": "string", "example": "The Blueprint" },
+                  "release_date": { "type": "string", "nullable": true, "description": "YYYY | YYYY-MM | YYYY-MM-DD", "example": "2001-09-11" },
+                  "album_type": { "type": "string", "nullable": true, "enum": ["album", "single", "compilation"] },
+                  "total_tracks": { "type": "integer", "nullable": true, "minimum": 1 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": { "description": "수정됨" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/albums/{id}/awards": {
+      "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+      "get": {
+        "tags": ["albums"],
+        "summary": "앨범 수상 경력 목록",
+        "description": "연도 내림차순(연도 없는 항목은 뒤). 없으면 빈 배열.",
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "integer" }, "host": { "type": "string", "example": "한국힙합어워즈" }, "name": { "type": "string", "example": "올해의 앨범" }, "year": { "type": "integer", "nullable": true, "example": 2024 } } } } } } }
+        }
+      },
+      "post": {
+        "tags": ["albums"],
+        "summary": "앨범 수상 경력 추가 (관리자 전용)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["host", "name"],
+                "properties": {
+                  "host": { "type": "string", "description": "주최", "example": "한국힙합어워즈" },
+                  "name": { "type": "string", "description": "수상명", "example": "올해의 앨범" },
+                  "year": { "type": "integer", "nullable": true, "minimum": 1900, "maximum": 2100 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "추가됨", "content": { "application/json": { "schema": { "type": "object", "properties": { "id": { "type": "integer" }, "host": { "type": "string", "example": "한국힙합어워즈" }, "name": { "type": "string", "example": "올해의 앨범" }, "year": { "type": "integer", "nullable": true, "example": 2024 } } } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/artists/{id}/awards": {
+      "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+      "get": {
+        "tags": ["artists"],
+        "summary": "아티스트 수상 경력 목록",
+        "description": "연도 내림차순(연도 없는 항목은 뒤). 없으면 빈 배열.",
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "integer" }, "host": { "type": "string", "example": "한국힙합어워즈" }, "name": { "type": "string", "example": "올해의 앨범" }, "year": { "type": "integer", "nullable": true, "example": 2024 } } } } } } }
+        }
+      },
+      "post": {
+        "tags": ["artists"],
+        "summary": "아티스트 수상 경력 추가 (관리자 전용)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["host", "name"],
+                "properties": {
+                  "host": { "type": "string", "description": "주최", "example": "한국힙합어워즈" },
+                  "name": { "type": "string", "description": "수상명", "example": "올해의 앨범" },
+                  "year": { "type": "integer", "nullable": true, "minimum": 1900, "maximum": 2100 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "추가됨", "content": { "application/json": { "schema": { "type": "object", "properties": { "id": { "type": "integer" }, "host": { "type": "string", "example": "한국힙합어워즈" }, "name": { "type": "string", "example": "올해의 앨범" }, "year": { "type": "integer", "nullable": true, "example": 2024 } } } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/awards/{id}": {
+      "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+      "delete": {
+        "tags": ["albums"],
+        "summary": "수상 경력 삭제 (관리자 전용)",
+        "responses": {
+          "204": { "description": "삭제됨" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
     "/users/{id}": {
       "get": {
         "tags": ["users"],
