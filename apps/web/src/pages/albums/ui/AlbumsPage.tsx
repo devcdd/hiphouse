@@ -11,6 +11,7 @@ import {
   parseSort,
   readStoredFilters,
   storeFilters,
+  DEFAULT_FILTER_QUERY,
 } from '@/features/album-filters'
 import { AlbumFeed } from '@/widgets/album-feed'
 import styles from './AlbumsPage.module.css'
@@ -40,11 +41,13 @@ export function AlbumsPage() {
   }
 
   // Opened with no query at all (logo click, fresh tab) → restore the last
-  // filters. Any explicit query, including one cleared back to empty, wins.
+  // filters, or the 정규+EP 기본값 on a first visit. Any explicit query,
+  // including one cleared back to empty, wins.
   const query = search.toString()
   useEffect(() => {
-    const stored = readStoredFilters()
-    if (query === '' && stored !== '') setSearch(stored, { replace: true })
+    if (query !== '') return
+    const next = readStoredFilters() ?? DEFAULT_FILTER_QUERY
+    if (next !== '') setSearch(next, { replace: true })
   }, [query])
 
   const typeParam = toTypeParam(types)

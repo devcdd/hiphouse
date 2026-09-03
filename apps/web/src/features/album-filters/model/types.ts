@@ -13,10 +13,13 @@ export const parseTypes = (raw: string | null): AlbumType[] =>
     .filter((s): s is AlbumType => VALID_TYPES.has(s as AlbumType))
 
 export const TYPE_OPTIONS: { key: AlbumType; label: string }[] = [
-  { key: 'single', label: '싱글' },
-  { key: 'ep', label: 'EP' },
   { key: 'album', label: '정규' },
+  { key: 'ep', label: 'EP' },
+  { key: 'single', label: '싱글' },
 ]
+
+// 첫 방문 기본값 — 싱글이 물량으로 피드를 덮어서 정규/EP만 켜고 시작한다.
+export const DEFAULT_FILTER_QUERY = 'type=album,ep'
 
 export const SORT_OPTIONS: { key: SortKey; label: string; hint: string }[] = [
   { key: 'recent', label: '최신순', hint: '발매일이 최근인 앨범부터' },
@@ -36,11 +39,13 @@ export const parseSort = (raw: string | null): SortKey =>
 // lost filter isn't worth crashing the page over.
 const FILTER_STORAGE_KEY = 'hiphouse:album-filters'
 
-export function readStoredFilters(): string {
+// null(저장된 적 없음)과 ''(사용자가 '전체'로 지운 상태)를 구분해야 첫 방문에만
+// DEFAULT_FILTER_QUERY를 적용하고, 직접 지운 필터는 되살리지 않는다.
+export function readStoredFilters(): string | null {
   try {
-    return sessionStorage.getItem(FILTER_STORAGE_KEY) ?? ''
+    return sessionStorage.getItem(FILTER_STORAGE_KEY)
   } catch {
-    return ''
+    return null
   }
 }
 
