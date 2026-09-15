@@ -52,6 +52,27 @@ export function AlbumDetailPage() {
           <div className={styles.info}>
             <h1 className={styles.name}>
               {displayName(album)}
+              {/* 연동된 스토어 마크 (관리자만) — Spotify는 PK라 항상, Apple은 apple_id가 붙은 앨범만 */}
+              {isAdmin && (
+                <span className={styles.sources}>
+                  {album.spotify_url && (
+                    <a href={album.spotify_url} target="_blank" rel="noreferrer" title="Spotify에서 열기">
+                      <img src="/spotify.svg" alt="Spotify" />
+                    </a>
+                  )}
+                  {album.apple_id && (
+                    <a
+                      href={`https://music.apple.com/kr/album/${album.apple_id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Apple Music에서 열기"
+                    >
+                      <img src="/apple-music.webp" alt="Apple Music" />
+                    </a>
+                  )}
+                </span>
+              )}
+              {album.content_rating === 'explicit' && <span className={styles.explicitBadge}>EXPLICIT</span>}
               {album.deleted_at && <span className={styles.deletedBadge}>삭제됨</span>}
             </h1>
             <p className={styles.artist}>
@@ -68,7 +89,11 @@ export function AlbumDetailPage() {
               {album.release_date && <Fact label="발매일" value={album.release_date} />}
               {album.type_label && <Fact label="유형" value={album.type_label} />}
               {album.total_tracks != null && <Fact label="트랙 수" value={`${album.total_tracks}곡`} />}
+              {album.label && <Fact label="레이블" value={album.label} />}
+              {album.genres && album.genres.length > 0 && <Fact label="장르" value={album.genres.join(', ')} />}
             </dl>
+            {album.copyright && <p className={styles.copyright}>{album.copyright}</p>}
+            {album.editorial_notes && <p className={styles.notes}>{album.editorial_notes}</p>}
 
             {/* Everyone sees the album's average; only members can add their own. */}
             <div className={styles.rating}>
