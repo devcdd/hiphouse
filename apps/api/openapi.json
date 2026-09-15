@@ -499,6 +499,36 @@
         }
       }
     },
+    "/admin/apple/status": {
+      "get": {
+        "tags": ["albums"],
+        "summary": "Apple Music 연동 현황 (관리자)",
+        "description": "삭제되지 않은 앨범 기준. albums = 앨범 수, linked = apple_id가 붙은 앨범 수, pending = 아직 Apple에 조회하지 않은 앨범 수, artists_linked = apple_id가 붙은 아티스트 수. configured = 서버에 APPLE_MUSIC_* 설정 여부.",
+        "responses": {
+          "200": { "description": "{configured, albums, linked, pending, artists_linked}", "content": { "application/json": { "schema": { "type": "object", "properties": {
+            "configured": { "type": "boolean" }, "albums": { "type": "integer" }, "linked": { "type": "integer" },
+            "pending": { "type": "integer" }, "artists_linked": { "type": "integer" }
+          } } } } }
+        }
+      }
+    },
+    "/admin/apple/link": {
+      "post": {
+        "tags": ["albums"],
+        "summary": "Apple Music 연동 배치 실행 (관리자)",
+        "description": "미조회 앨범을 최신 발매순으로 최대 limit개 골라 Apple 카탈로그를 조회하고 (UPC 있으면 filter[upc] 25개당 요청 1회, 없으면 대표 아티스트+앨범명 검색 후 발매일·트랙 수 일치 검증 — 앨범당 2회) apple_id·label·genres를 채운다. 앨범의 크레딧 아티스트는 이름(name·display_name·aliases, 단독 크레딧이면 무조건)으로 Apple 아티스트와 맞춰 apple_id·genres를 채운다. 앨범·아티스트·트랙의 display_name이 비어 있고 Apple 한글 표기가 Spotify 이름과 다르면 채운다 (관리자 입력값은 유지). 트랙은 양쪽 트랙 수가 같을 때 (disc, track) 위치로 맞춘다. 조회한 앨범은 미발견이어도 apple_checked_at을 찍어 다시 집지 않는다. Apple 오류 시 배치를 중단하고 진행분과 함께 error로 보고. remaining이 0이 될 때까지 반복 호출. 크롤·신보 체크가 새 앨범을 넣을 때는 자동으로 같은 연결을 수행한다.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "properties": {
+            "limit": { "type": "integer", "default": 50, "minimum": 1, "maximum": 100 }
+          } } } }
+        },
+        "responses": {
+          "200": { "description": "{checked, linked, artists_linked, named, remaining, error?}" },
+          "400": { "description": "APPLE_MUSIC_* 미설정" }
+        }
+      }
+    },
     "/admin/tracks/status": {
       "get": {
         "tags": ["albums"],
@@ -660,7 +690,13 @@
           "album_type": { "type": "string", "nullable": true, "example": "album" },
           "total_tracks": { "type": "integer", "nullable": true, "example": 12 },
           "image_url": { "type": "string", "nullable": true },
-          "spotify_url": { "type": "string", "nullable": true }
+          "spotify_url": { "type": "string", "nullable": true },
+          "apple_id": { "type": "string", "nullable": true, "description": "Apple Music 카탈로그 앨범 id — UPC 매칭으로 연결 (apple.go). 미연결이면 null" },
+          "label": { "type": "string", "nullable": true, "description": "Apple recordLabel. Spotify label 필드는 2026-02 개편으로 죽어 Apple이 유일한 소스" },
+          "genres": { "type": "array", "nullable": true, "items": { "type": "string" }, "description": "Apple 앨범 장르 (루트 \"음악\" 제외)" },
+          "copyright": { "type": "string", "nullable": true, "description": "℗ 한 줄 (Apple copyright)" },
+          "content_rating": { "type": "string", "nullable": true, "description": "Apple contentRating: explicit | clean | null" },
+          "editorial_notes": { "type": "string", "nullable": true, "description": "Apple 에디토리얼 노트 평문 (태그 제거, 줄바꿈 포함)" }
         }
       },
       "Artist": {

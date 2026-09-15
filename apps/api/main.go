@@ -20,6 +20,7 @@ type server struct {
 	kakaoSecret string
 	adminIDs    map[string]bool
 	sp          *spotifyTokens
+	apple       *appleAuth
 }
 
 func main() {
@@ -55,6 +56,7 @@ func main() {
 		kakaoSecret: os.Getenv("KAKAO_CLIENT_SECRET"),
 		adminIDs:    parseAdminIDs(os.Getenv("ADMIN_KAKAO_IDS")),
 		sp:          newSpotifyTokens(),
+		apple:       &appleAuth{},
 	}
 	if err := s.ensureAuthSchema(ctx); err != nil {
 		log.Fatalf("auth schema: %v", err)
@@ -156,6 +158,10 @@ func main() {
 	// Admin 신보 체크 — DB 보유 아티스트의 새 앨범을 배치로 감지해 자동 추가
 	mux.HandleFunc("GET /admin/spotify/releases-status", s.requireAdmin(s.adminReleasesStatus))
 	mux.HandleFunc("POST /admin/spotify/check-releases", s.requireAdmin(s.adminCheckReleases))
+
+	// Admin Apple Music 연동 — UPC로 Apple 앨범을 찾아 레이블·장르·apple_id 백필
+	mux.HandleFunc("GET /admin/apple/status", s.requireAdmin(s.adminAppleStatus))
+	mux.HandleFunc("POST /admin/apple/link", s.requireAdmin(s.adminAppleLink))
 
 	// Admin 트랙 동기화 — batch-backfill track lists for albums that lack them
 	mux.HandleFunc("GET /admin/tracks/status", s.requireAdmin(s.adminTracksStatus))
@@ -306,6 +312,16 @@ func (s *server) ensureAuthSchema(ctx context.Context) error {
 		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS upc TEXT;
 		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS copyrights JSONB;
 		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS release_date_precision TEXT;
+		-- Apple Music 연동 (apple.go): UPC로 찾은 Apple 앨범 id와 거기서 온 레이블·장르.
+		-- apple_checked_at은 조회 시도 스탬프 (미발견도 찍힘 = 재조회 안 함).
+		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS apple_id TEXT;
+		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS apple_checked_at TIMESTAMPTZ;
+		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS label TEXT;
+		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS genres TEXT[];
+		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS copyright TEXT;
+		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS content_rating TEXT;
+		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS editorial_notes TEXT;
+		ALTER TABLE IF EXISTS artists ADD COLUMN IF NOT EXISTS apple_id TEXT;
 		-- 신보 체크: 아티스트별 마지막 확인 시각. NULL = 아직 한 번도 안 봄.
 		ALTER TABLE IF EXISTS artists ADD COLUMN IF NOT EXISTS releases_checked_at TIMESTAMPTZ;
 

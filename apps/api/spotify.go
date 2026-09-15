@@ -514,6 +514,7 @@ func (s *server) adminSpotifyCrawl(w http.ResponseWriter, r *http.Request) {
 
 	enriched := s.enrichCredited(r.Context(), body.Key, credited)
 	tracksSynced := s.syncNewAlbumTracks(r.Context(), body.Key, market, albumIDs)
+	s.linkNewAlbums(r.Context(), albumIDs)
 
 	var name *string
 	_ = s.db.QueryRow(r.Context(), "SELECT name FROM artists WHERE id=$1", body.ArtistID).Scan(&name)
@@ -656,6 +657,7 @@ func (s *server) adminSpotifyCrawlAlbum(w http.ResponseWriter, r *http.Request) 
 
 	enriched := s.enrichCredited(r.Context(), body.Key, credited)
 	tracksSynced := s.syncNewAlbumTracks(r.Context(), body.Key, market, []string{al.ID})
+	s.linkNewAlbums(r.Context(), []string{al.ID})
 
 	var deleted bool
 	_ = s.db.QueryRow(r.Context(), "SELECT deleted_at IS NOT NULL FROM albums WHERE id=$1", al.ID).Scan(&deleted)
@@ -847,6 +849,7 @@ func (s *server) checkReleasesBatch(ctx context.Context, key string, limit int) 
 	}
 	if len(newAlbumIDs) > 0 {
 		res.TracksSynced = s.syncNewAlbumTracks(ctx, key, market, newAlbumIDs)
+		s.linkNewAlbums(ctx, newAlbumIDs) // 트랙 동기화가 UPC를 채운 뒤라야 Apple 매칭이 된다
 	}
 
 	if err := s.db.QueryRow(ctx, "SELECT COUNT(*)::int "+releaseStaleSQL).Scan(&res.Remaining); err != nil {
