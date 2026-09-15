@@ -23,6 +23,9 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-hiphouse}:${POSTGRES_PASSWORD:-hiphouse}@db:5432/${POSTGRES_DB:-hiphouse}
+    # Apple MusicKit .p8 — 서버 .env의 APPLE_MUSIC_PRIVATE_KEY_PATH는 컨테이너 경로(/secrets/…)로
+    volumes:
+      - ./secrets:/secrets:ro
     depends_on:
       db:
         condition: service_healthy

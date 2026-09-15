@@ -89,10 +89,26 @@ jobs:
           # Isolated docker config: the job's ghcr login (short-lived GITHUB_TOKEN)
           # must not clobber the operator's persistent PAT login in ~/.docker.
           DOCKER_CONFIG: /tmp/hiphouse-deploy-docker
+          APPLE_MUSIC_PRIVATE_KEY: ${{ secrets.APPLE_MUSIC_PRIVATE_KEY }}
+          APPLE_MUSIC_TEAM_ID: ${{ secrets.APPLE_MUSIC_TEAM_ID }}
+          APPLE_MUSIC_KEY_ID: ${{ secrets.APPLE_MUSIC_KEY_ID }}
         run: |
           mkdir -p "$DEPLOY_PATH" "$DOCKER_CONFIG"
           cp docker-compose.prod.yml "$DEPLOY_PATH/"
           cd "$DEPLOY_PATH"
+          # Apple MusicKit 키: secrets → 서버 파일 + .env 항목 (나머지 .env는 서버가 관리).
+          # api 컨테이너가 nonroot(65532)로 읽어야 해서 644 — 파일은 배포 경로 밖으로 안 나간다.
+          if [ -n "$APPLE_MUSIC_PRIVATE_KEY" ]; then
+            mkdir -p secrets
+            printf '%s\n' "$APPLE_MUSIC_PRIVATE_KEY" > secrets/MusicKit.p8
+            chmod 644 secrets/MusicKit.p8
+            touch .env
+            for kv in "APPLE_MUSIC_TEAM_ID=$APPLE_MUSIC_TEAM_ID" "APPLE_MUSIC_KEY_ID=$APPLE_MUSIC_KEY_ID" \
+                      "APPLE_MUSIC_PRIVATE_KEY_PATH=/secrets/MusicKit.p8" "APPLE_MUSIC_STOREFRONT=kr"; do
+              k="${kv%%=*}"
+              { grep -v "^$k=" .env || true; echo "$kv"; } > .env.tmp && mv .env.tmp .env
+            done
+          fi
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           docker compose -f docker-compose.prod.yml pull
           docker compose -f docker-compose.prod.yml up -d
