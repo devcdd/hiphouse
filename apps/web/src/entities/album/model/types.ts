@@ -41,6 +41,12 @@ export interface Album {
   total_tracks: number | null
   image_url: string | null
   spotify_url: string | null
+  apple_id: string | null // Apple Music 카탈로그 앨범 id — UPC 매칭으로 연결, 미연결이면 null
+  label: string | null // Apple recordLabel (Spotify label 필드는 2026-02 개편으로 죽음)
+  genres: string[] | null // Apple 앨범 장르 (루트 "음악" 제외)
+  copyright: string | null // ℗ 한 줄 (Apple)
+  content_rating: string | null // "explicit" | "clean" | null (Apple)
+  editorial_notes: string | null // Apple 에디토리얼 노트 평문, 줄바꿈 포함
   type_label: string | null // 싱글 | EP | 정규 (server-computed)
   rating_avg: number | null // 평균 별점 0..5 (아무도 평가 안 했으면 null)
   rating_count: number

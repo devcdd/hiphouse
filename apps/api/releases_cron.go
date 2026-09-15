@@ -35,6 +35,7 @@ func (s *server) scheduleReleaseSweep(ctx context.Context) {
 		case <-t.C:
 		}
 		s.sweepReleases(ctx)
+		s.sweepApple(ctx)
 	}
 }
 

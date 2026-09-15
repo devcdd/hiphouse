@@ -50,6 +50,13 @@ type Album struct {
 	TotalTracks *int    `json:"total_tracks" db:"total_tracks"`
 	ImageURL    *string `json:"image_url" db:"image_url"`
 	SpotifyURL  *string `json:"spotify_url" db:"spotify_url"`
+	// Apple Music 연동(apple.go)이 UPC 매칭으로 채움. Spotify가 죽인 레이블·장르의 소스.
+	AppleID        *string  `json:"apple_id" db:"apple_id"`
+	Label          *string  `json:"label" db:"label"`
+	Genres         []string `json:"genres" db:"genres"`
+	Copyright      *string  `json:"copyright" db:"copyright"`             // ℗ 한 줄 (Apple copyright)
+	ContentRating  *string  `json:"content_rating" db:"content_rating"`   // "explicit" | "clean" | null
+	EditorialNotes *string  `json:"editorial_notes" db:"editorial_notes"` // Apple 에디토리얼 노트, 태그 제거된 평문
 	// Read-only, computed on SELECT (not written to the albums table).
 	TypeLabel *string `json:"type_label" db:"type_label"`
 	// Rating aggregates over the ratings table. RatingAvg is in stars (0..5),
@@ -76,6 +83,7 @@ const ratingAvgExpr = "(rating_sum::float / NULLIF(rating_count, 0) / 2)"
 
 const albumSelectCols = albumCols + `,
 	display_name,
+	apple_id, label, genres, copyright, content_rating, editorial_notes,
 	CASE WHEN album_type='album' THEN '정규'
 	     WHEN album_type='single' AND total_tracks >= 3 THEN 'EP'
 	     WHEN album_type='single' THEN '싱글'

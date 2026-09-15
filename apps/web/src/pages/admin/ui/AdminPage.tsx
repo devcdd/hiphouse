@@ -7,6 +7,7 @@ import { AliasManagerTab } from './AliasManagerTab'
 import { CrawlTab } from './CrawlTab'
 import { TracksTab } from './TracksTab'
 import { ReleasesTab } from './ReleasesTab'
+import { AppleTab } from './AppleTab'
 import { StatsTab } from './StatsTab'
 import { ReportsTab } from './ReportsTab'
 import { RenameRequestsTab } from './RenameRequestsTab'
@@ -16,11 +17,12 @@ import 'swiper/css/free-mode'
 import 'swiper/css/mousewheel'
 import styles from './AdminPage.module.css'
 
-type Tab = 'deleted' | 'aliases' | 'crawl' | 'tracks' | 'releases' | 'stats' | 'reports' | 'rename' | 'users'
+type Tab = 'deleted' | 'aliases' | 'crawl' | 'tracks' | 'releases' | 'apple' | 'stats' | 'reports' | 'rename' | 'users'
 const TABS: { key: Tab; label: string }[] = [
   { key: 'crawl', label: '크롤링' },
   { key: 'releases', label: '신보 체크' },
   { key: 'tracks', label: '트랙 동기화' },
+  { key: 'apple', label: 'Apple 연동' },
   { key: 'aliases', label: '연관검색어' },
   { key: 'deleted', label: '삭제된 앨범' },
   { key: 'reports', label: '힙합 아님 신고' },
@@ -77,6 +79,8 @@ export function AdminPage() {
         <ReleasesTab />
       ) : tab === 'tracks' ? (
         <TracksTab />
+      ) : tab === 'apple' ? (
+        <AppleTab />
       ) : tab === 'deleted' ? (
         <DeletedAlbumsTab />
       ) : tab === 'stats' ? (
