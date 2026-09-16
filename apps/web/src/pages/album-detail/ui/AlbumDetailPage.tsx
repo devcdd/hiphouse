@@ -18,6 +18,10 @@ import { AlbumDetailSkeleton } from './AlbumDetailSkeleton'
 import { TrackList } from './TrackList'
 import styles from './AlbumDetailPage.module.css'
 
+// Apple 기기는 Music 앱이 기본 설치라 music:// 스킴으로 앱을 바로 연다. iPadOS는 UA가 Macintosh로 잡혀도 같이 걸린다.
+const isApple = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent)
+const appleMusicHref = (id: string) => `${isApple ? 'music' : 'https'}://music.apple.com/kr/album/${id}`
+
 export function AlbumDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
@@ -52,26 +56,24 @@ export function AlbumDetailPage() {
           <div className={styles.info}>
             <h1 className={styles.name}>
               {displayName(album)}
-              {/* 연동된 스토어 마크 (관리자만) — Spotify는 PK라 항상, Apple은 apple_id가 붙은 앨범만 */}
-              {isAdmin && (
-                <span className={styles.sources}>
-                  {album.spotify_url && (
-                    <a href={album.spotify_url} target="_blank" rel="noreferrer" title="Spotify에서 열기">
-                      <img src="/spotify.svg" alt="Spotify" />
-                    </a>
-                  )}
-                  {album.apple_id && (
-                    <a
-                      href={`https://music.apple.com/kr/album/${album.apple_id}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      title="Apple Music에서 열기"
-                    >
-                      <img src="/apple-music.webp" alt="Apple Music" />
-                    </a>
-                  )}
-                </span>
-              )}
+              {/* 스토어 링크 — Spotify는 PK라 항상, Apple은 apple_id가 붙은 앨범만 */}
+              <span className={styles.sources}>
+                {album.spotify_url && (
+                  <a href={album.spotify_url} target="_blank" rel="noreferrer" title="Spotify에서 열기">
+                    <img src="/spotify.svg" alt="Spotify" />
+                  </a>
+                )}
+                {album.apple_id && (
+                  <a
+                    href={appleMusicHref(album.apple_id)}
+                    target={isApple ? undefined : '_blank'}
+                    rel="noreferrer"
+                    title="Apple Music에서 열기"
+                  >
+                    <img src="/apple-music.webp" alt="Apple Music" />
+                  </a>
+                )}
+              </span>
               {album.content_rating === 'explicit' && <span className={styles.explicitBadge}>EXPLICIT</span>}
               {album.deleted_at && <span className={styles.deletedBadge}>삭제됨</span>}
             </h1>
