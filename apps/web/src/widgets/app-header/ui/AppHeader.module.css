@@ -8,6 +8,8 @@
   gap: 24px;
   row-gap: 10px;
   padding: 16px 24px;
+  /* #root flex 컬럼 안에서 margin:auto가 stretch를 막아 내용 폭으로 줄어드는 것 방지 */
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
   background: color-mix(in srgb, var(--bg) 88%, transparent);
