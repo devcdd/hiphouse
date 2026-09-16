@@ -1,3 +1,6 @@
+# compose 프로젝트명이 디렉토리명을 따라가지 않도록 고정 (볼륨·네트워크 이름 안정)
+name: hiphouse
+
 services:
   db:
     image: postgres:17-alpine
