@@ -1,0 +1,45 @@
+.footer {
+  /* 짧은 페이지(즐겨찾기 미로그인 등)에서도 바닥에 붙도록 #root flex 컬럼의 나머지를 밀어냄 */
+  margin-top: auto;
+  border-top: 1px solid var(--surface);
+}
+
+.inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px 24px 28px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 20px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.brand {
+  font-weight: 600;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.15s ease;
+}
+
+.link:hover {
+  color: var(--fg);
+}
+
+@media (max-width: 640px) {
+  .inner {
+    padding: 16px 16px 24px;
+  }
+}
