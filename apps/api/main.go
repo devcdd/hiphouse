@@ -170,6 +170,17 @@ func main() {
 	mux.HandleFunc("GET /openapi.json", serveSpec)
 	mux.HandleFunc("GET /swagger/", swaggerUI)
 
+	// apple_type 컬럼 도입 시점 백필: 이미 링크된 앨범 유형을 기동 직후 한 번 채운다. 다 차면 no-op.
+	go func() {
+		if !appleConfigured() {
+			return
+		}
+		if n, err := s.backfillAppleTypes(ctx, 5000); err != nil {
+			log.Printf("apple_type 백필 중단(%d개 채움): %v", n, err)
+		} else if n > 0 {
+			log.Printf("apple_type 백필 %d개", n)
+		}
+	}()
 	go s.scheduleReleaseSweep(ctx)
 
 	log.Printf("listening on :%s  (swagger: http://localhost:%s/swagger/)", port, port)
@@ -321,6 +332,9 @@ func (s *server) ensureAuthSchema(ctx context.Context) error {
 		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS copyright TEXT;
 		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS content_rating TEXT;
 		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS editorial_notes TEXT;
+		-- Apple 스토어 등록 유형(album/ep/single). 이름 접미어 " - EP"/" - Single"에서 뽑는다.
+		-- Spotify는 EP를 single로 뭉개고 트랙 수 휴리스틱은 3트랙 싱글·7트랙+ 정규를 틀리므로 이 값이 우선.
+		ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS apple_type TEXT;
 		ALTER TABLE IF EXISTS artists ADD COLUMN IF NOT EXISTS apple_id TEXT;
 		-- 신보 체크: 아티스트별 마지막 확인 시각. NULL = 아직 한 번도 안 봄.
 		ALTER TABLE IF EXISTS artists ADD COLUMN IF NOT EXISTS releases_checked_at TIMESTAMPTZ;

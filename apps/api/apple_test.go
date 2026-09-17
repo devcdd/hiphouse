@@ -167,6 +167,14 @@ func TestAmTitle(t *testing.T) {
 	}
 }
 
+func TestAmKind(t *testing.T) {
+	for in, want := range map[string]string{"WORTHY - EP": "ep", "내리고 (feat. JUSTHIS) - Single": "single", "Drunk Night / Not Yours - Single": "single", "Dogma": "album", "Single": "album"} {
+		if got := amKind(in); got != want {
+			t.Errorf("amKind(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 func TestKoreanName(t *testing.T) {
 	if got := koreanName("Work (feat. Swings)"); got != nil {
 		t.Errorf("latin-only title must not become a display name, got %q", *got)
