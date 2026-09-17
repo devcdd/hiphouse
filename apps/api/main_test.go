@@ -47,7 +47,7 @@ func TestBuildAlbumListQuery(t *testing.T) {
 		"albums.name ~* $3", "albums.display_name ~* $3",
 		"ar.name ~* $3", "ar.display_name ~* $3", "al ~* $3",
 		"t.name ~* $3", "t.display_name ~* $3",
-		"(album_type='single' AND total_tracks < 3)", "(album_type='single' AND total_tracks >= 3)", " OR ",
+		typeCond("single"), typeCond("ep"), " OR ",
 		"total_tracks DESC", "LIMIT $4", "OFFSET $5",
 	} {
 		if !strings.Contains(sql, frag) {
@@ -299,5 +299,18 @@ func TestRefreshTokenMinting(t *testing.T) {
 	}
 	if refreshTokenTTL <= accessTokenTTL {
 		t.Fatal("refresh token must outlive the access token")
+	}
+}
+
+// Apple 등록 유형이 있으면 그것, 없으면 트랙 수 휴리스틱 — SQL 문자열 수준 계약.
+func TestTypeCondPrefersAppleType(t *testing.T) {
+	for _, k := range []string{"single", "ep", "album"} {
+		c := typeCond(k)
+		if !strings.Contains(c, "COALESCE(apple_type") || !strings.HasSuffix(c, "='"+k+"')") {
+			t.Errorf("typeCond(%q) = %s", k, c)
+		}
+	}
+	if typeCond("compilation") != "" {
+		t.Errorf("compilation is not a UI filter key")
 	}
 }

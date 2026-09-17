@@ -324,6 +324,18 @@ func amTitle(name string) string {
 	return strings.TrimSpace(name)
 }
 
+// amKind — Apple 스토어 등록 유형. isSingle 플래그는 1트랙일 때만 true라 못 쓰고,
+// 이름 접미어가 등록 규칙(1~3트랙 Single, 4~6트랙 EP, 그 외 Album)을 그대로 담는다.
+func amKind(name string) string {
+	switch {
+	case strings.HasSuffix(name, " - Single"):
+		return "single"
+	case strings.HasSuffix(name, " - EP"):
+		return "ep"
+	}
+	return "album"
+}
+
 type appleLinkResult struct {
 	Checked       int     `json:"checked"`        // 이번에 Apple에 조회한 앨범 수
 	Linked        int     `json:"linked"`         // apple_id가 새로 붙은 앨범 수
@@ -467,11 +479,12 @@ func (s *server) applyAppleAlbum(ctx context.Context, c appleCand, al *amAlbum, 
 	title := koreanName(amTitle(al.Attributes.Name))
 	if err := s.db.QueryRow(ctx,
 		`UPDATE albums SET apple_id=$2, label=$3, genres=$4, apple_checked_at=now(),
-		   copyright=$6, content_rating=$7, editorial_notes=$8,
+		   copyright=$6, content_rating=$7, editorial_notes=$8, apple_type=$9,
 		   display_name = CASE WHEN display_name IS NULL AND lower($5::text) <> lower(name) THEN $5::text ELSE display_name END
 		 WHERE id=$1 RETURNING COALESCE(display_name = $5::text AND lower($5::text) <> lower(name), false)`,
 		c.ID, al.ID, amLabel(al.Attributes.RecordLabel), amGenres(al.Attributes.GenreNames), title,
-		strPtr(strings.TrimSpace(al.Attributes.Copyright)), strPtr(al.Attributes.ContentRating), amNotes(al.Attributes.EditorialNotes.Standard, al.Attributes.EditorialNotes.Short)).Scan(&named); err != nil {
+		strPtr(strings.TrimSpace(al.Attributes.Copyright)), strPtr(al.Attributes.ContentRating), amNotes(al.Attributes.EditorialNotes.Standard, al.Attributes.EditorialNotes.Short),
+		amKind(al.Attributes.Name)).Scan(&named); err != nil {
 		return err
 	}
 	res.Linked++
@@ -609,6 +622,51 @@ func (s *server) appleLinkBatch(ctx context.Context, limit int) (appleLinkResult
 	return res, err
 }
 
+// backfillAppleTypes — apple_type 컬럼 추가 전에 연결된 앨범의 유형을 채운다.
+// 이름만 필요하니 include 없이 ids 조회. 다 차면 0을 돌려주고 이후엔 no-op.
+func (s *server) backfillAppleTypes(ctx context.Context, limit int) (int, error) {
+	rows, err := s.db.Query(ctx,
+		"SELECT id, apple_id FROM albums WHERE apple_id IS NOT NULL AND apple_type IS NULL ORDER BY release_date DESC NULLS LAST LIMIT $1", limit)
+	if err != nil {
+		return 0, err
+	}
+	pairs, err := pgx.CollectRows(rows, pgx.RowToStructByPos[struct{ ID, AppleID string }])
+	if err != nil || len(pairs) == 0 {
+		return 0, err
+	}
+	done := 0
+	for start := 0; start < len(pairs); start += amUPCBatch {
+		chunk := pairs[start:min(start+amUPCBatch, len(pairs))]
+		ids := make([]string, 0, len(chunk))
+		for _, p := range chunk {
+			ids = append(ids, p.AppleID)
+		}
+		var page struct {
+			Data []amAlbum `json:"data"`
+		}
+		q := url.Values{"ids": {strings.Join(ids, ",")}, "l": {"ko"}}
+		if err := s.amGet(ctx, "albums?"+q.Encode(), &page); err != nil {
+			return done, err
+		}
+		kind := make(map[string]string, len(page.Data))
+		for _, al := range page.Data {
+			kind[al.ID] = amKind(al.Attributes.Name)
+		}
+		for _, p := range chunk {
+			k, ok := kind[p.AppleID]
+			if !ok {
+				// Apple에서 사라진 id — 휴리스틱으로 남기되 매번 재조회하지 않도록 빈 문자열 대신 건너뜀
+				continue
+			}
+			if _, err := s.db.Exec(ctx, "UPDATE albums SET apple_type=$2 WHERE id=$1", p.ID, k); err != nil {
+				return done, err
+			}
+			done++
+		}
+	}
+	return done, nil
+}
+
 // linkNewAlbums — 크롤/신보 체크가 방금 넣은 앨범을 best-effort로 연결한다.
 // Apple 미설정이면 조용히 건너뛴다.
 func (s *server) linkNewAlbums(ctx context.Context, albumIDs []string) {
@@ -635,6 +693,11 @@ const (
 func (s *server) sweepApple(ctx context.Context) {
 	if !appleConfigured() {
 		return
+	}
+	if n, err := s.backfillAppleTypes(ctx, appleSweepBatch*appleSweepBatches); err != nil {
+		log.Printf("apple sweep: 유형 백필 중단(%d개 채움): %v", n, err)
+	} else if n > 0 {
+		log.Printf("apple sweep: 유형 백필 %d개", n)
 	}
 	total := appleLinkResult{}
 	for i := 0; i < appleSweepBatches; i++ {
@@ -693,6 +756,10 @@ func (s *server) adminAppleLink(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Limit < 1 || body.Limit > 100 {
 		body.Limit = 50
+	}
+	if _, err := s.backfillAppleTypes(r.Context(), body.Limit); err != nil {
+		writeErr(w, 502, "apple_type 백필 실패: "+err.Error())
+		return
 	}
 	res, err := s.appleLinkBatch(r.Context(), body.Limit)
 	if err != nil {

@@ -14,15 +14,17 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+// effTypeExpr — 앨범 유형(album/ep/single/compilation). Apple 등록 유형이 있으면
+// 그것, 없으면 Spotify album_type + 트랙 수 휴리스틱(3트랙 이상 single = EP).
+// 컴필레이션은 Spotify 값 유지 (Apple은 접미어 없이 album으로 나옴).
+const effTypeExpr = `CASE WHEN album_type='compilation' THEN 'compilation'
+	ELSE COALESCE(apple_type, CASE WHEN album_type='single' AND total_tracks >= 3 THEN 'ep' ELSE album_type END) END`
+
 // typeCond maps a UI type key to its SQL predicate (values fixed → safe to inline).
 func typeCond(t string) string {
 	switch t {
-	case "single":
-		return "(album_type='single' AND total_tracks < 3)"
-	case "ep":
-		return "(album_type='single' AND total_tracks >= 3)"
-	case "album":
-		return "(album_type='album')"
+	case "single", "ep", "album":
+		return "(" + effTypeExpr + "='" + t + "')"
 	}
 	return ""
 }
@@ -84,10 +86,11 @@ const ratingAvgExpr = "(rating_sum::float / NULLIF(rating_count, 0) / 2)"
 const albumSelectCols = albumCols + `,
 	display_name,
 	apple_id, label, genres, copyright, content_rating, editorial_notes,
-	CASE WHEN album_type='album' THEN '정규'
-	     WHEN album_type='single' AND total_tracks >= 3 THEN 'EP'
-	     WHEN album_type='single' THEN '싱글'
-	     WHEN album_type='compilation' THEN '컴필레이션'
+	CASE ` + effTypeExpr + `
+	     WHEN 'album' THEN '정규'
+	     WHEN 'ep' THEN 'EP'
+	     WHEN 'single' THEN '싱글'
+	     WHEN 'compilation' THEN '컴필레이션'
 	     ELSE album_type END AS type_label,
 	` + ratingAvgExpr + ` AS rating_avg,
 	rating_count,
@@ -448,7 +451,8 @@ func (s *server) updateAlbumInfo(w http.ResponseWriter, r *http.Request) {
 		year = yearOf(*rd)
 	}
 	tag, err := s.db.Exec(r.Context(),
-		`UPDATE albums SET name=$2, release_date=$3, year=$4, album_type=$5, total_tracks=$6, info_edited_at=now()
+		`UPDATE albums SET name=$2, release_date=$3, year=$4, album_type=$5, total_tracks=$6, info_edited_at=now(),
+		   apple_type = CASE WHEN $5::text IS NULL THEN apple_type ELSE NULL END
 		 WHERE id=$1`,
 		r.PathValue("id"), body.Name, rd, year, at, body.TotalTracks)
 	if err != nil {
