@@ -18,7 +18,7 @@ services:
       retries: 15
 
   api:
-    image: ghcr.io/${GH_OWNER}/hiphouse-api:latest
+    image: ghcr.io/${GH_OWNER}/hiphouse-api:${IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file: .env
     environment:
@@ -31,7 +31,7 @@ services:
         condition: service_healthy
 
   web:
-    image: ghcr.io/${GH_OWNER}/hiphouse-web:latest
+    image: ghcr.io/${GH_OWNER}/hiphouse-web:${IMAGE_TAG:-latest}
     restart: unless-stopped
     # Host nginx (see deploy/nginx/hiphouse.kr.conf) terminates 80/443 and proxies here.
     # Bind to loopback only so the container isn't reachable from outside the host.
@@ -42,7 +42,7 @@ services:
 
   # One-shot crawler: docker compose -f docker-compose.prod.yml --profile crawl run --rm crawler
   crawler:
-    image: ghcr.io/${GH_OWNER}/hiphouse-crawler:latest
+    image: ghcr.io/${GH_OWNER}/hiphouse-crawler:${IMAGE_TAG:-latest}
     profiles: ["crawl"]
     env_file: .env
     environment:
