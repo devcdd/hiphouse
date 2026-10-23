@@ -112,6 +112,9 @@ jobs:
               APPLE_MUSIC_TEAM_ID "$APPLE_MUSIC_TEAM_ID" APPLE_MUSIC_KEY_ID "$APPLE_MUSIC_KEY_ID"
             cat <<'EOF'
           set -euo pipefail
+          # 같은 서버에 배포하는 다른 프로젝트와 순서대로 — 동시에 돌면 상대의 image prune 이 받는 중인 이미지를 지움
+          exec 9>/tmp/docker-deploy.lock
+          flock 9
           cd "$DEPLOY_PATH"
           # Apple MusicKit 키: secrets → 서버 파일 + .env 항목 (나머지 .env는 서버가 관리).
           # api 컨테이너가 nonroot(65532)로 읽어야 해서 644 — 파일은 배포 경로 밖으로 안 나간다.
