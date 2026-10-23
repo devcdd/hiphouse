@@ -76,25 +76,42 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
 
-  # Runs ON the server via the self-hosted runner (name: hiphouse, user: ubuntu) — no SSH needed.
+  # 서버(1.8GB)에 러너·빌드 부담을 두지 않으려고, GitHub 러너에서 SSH 로 서버에 접속해 재기동만 한다.
   # DEPLOY_PATH (repo variable) must already contain .env (see .env.example).
+  # secrets: EC2_HOST, EC2_SSH_KEY(배포 전용 키), EC2_KNOWN_HOSTS(서버 호스트 키 고정)
   deploy:
     needs: build-push
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: SSH 설정
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$EC2_KNOWN_HOSTS" > ~/.ssh/known_hosts
       - name: Roll the stack
         env:
+          SERVER: ubuntu@${{ secrets.EC2_HOST }}
           DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/root/hiphouse' }}
-          # Isolated docker config: the job's ghcr login (short-lived GITHUB_TOKEN)
-          # must not clobber the operator's persistent PAT login in ~/.docker.
-          DOCKER_CONFIG: /tmp/hiphouse-deploy-docker
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_MUSIC_PRIVATE_KEY: ${{ secrets.APPLE_MUSIC_PRIVATE_KEY }}
           APPLE_MUSIC_TEAM_ID: ${{ secrets.APPLE_MUSIC_TEAM_ID }}
           APPLE_MUSIC_KEY_ID: ${{ secrets.APPLE_MUSIC_KEY_ID }}
         run: |
-          mkdir -p "$DEPLOY_PATH" "$DOCKER_CONFIG"
-          cp docker-compose.prod.yml "$DEPLOY_PATH/"
+          ssh "$SERVER" "mkdir -p '$DEPLOY_PATH'"
+          scp docker-compose.prod.yml "$SERVER:$DEPLOY_PATH/"
+          # 값은 원격 셸 stdin 으로만 넘김 — ssh 인자로 넘기면 서버 ps 에 비밀값이 보이고 따옴표도 깨짐
+          {
+            printf 'export %s=%q\n' DEPLOY_PATH "$DEPLOY_PATH" IMAGE_TAG "sha-${GITHUB_SHA::7}" \
+              GHCR_USER "$GITHUB_ACTOR" GHCR_TOKEN "$GHCR_TOKEN" \
+              APPLE_MUSIC_PRIVATE_KEY "$APPLE_MUSIC_PRIVATE_KEY" \
+              APPLE_MUSIC_TEAM_ID "$APPLE_MUSIC_TEAM_ID" APPLE_MUSIC_KEY_ID "$APPLE_MUSIC_KEY_ID"
+            cat <<'EOF'
+          set -euo pipefail
           cd "$DEPLOY_PATH"
           # Apple MusicKit 키: secrets → 서버 파일 + .env 항목 (나머지 .env는 서버가 관리).
           # api 컨테이너가 nonroot(65532)로 읽어야 해서 644 — 파일은 배포 경로 밖으로 안 나간다.
@@ -109,7 +126,13 @@ jobs:
               { grep -v "^$k=" .env || true; echo "$kv"; } > .env.tmp && mv .env.tmp .env
             done
           fi
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          # Isolated docker config: the job's ghcr login (short-lived GITHUB_TOKEN)
+          # must not clobber the operator's persistent PAT login in ~/.docker.
+          export DOCKER_CONFIG=/tmp/hiphouse-deploy-docker
+          mkdir -p "$DOCKER_CONFIG"
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
           docker compose -f docker-compose.prod.yml pull
           docker compose -f docker-compose.prod.yml up -d
           docker image prune -f
+          EOF
+          } | ssh "$SERVER" bash -s
