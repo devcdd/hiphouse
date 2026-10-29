@@ -4,44 +4,38 @@ import { Download, Search, X } from 'lucide-react'
 import { Avatar } from '@/shared/ui/Avatar'
 import { useDebouncedValue } from '@/shared/lib/useDebouncedValue'
 import { fetchAlbums } from '@/entities/album'
-import { searchSpotifyAlbums, searchSpotifyArtists, type SpotifyArtistHit } from '../api/spotifyAdminApi'
-import { crawlAlbum, crawlArtist, fetchSpotifyKeys } from '@/features/crawl-artist'
+import { searchAppleAlbums, searchAppleArtists, type AppleArtistHit } from '../api/appleAdminApi'
+import { crawlAppleAlbum, crawlAppleArtist } from '@/features/crawl-artist'
 import styles from './AdminPage.module.css'
-
-const nf = new Intl.NumberFormat('ko-KR')
 
 type Mode = 'artist' | 'album'
 
-// 웹에서 바로 크롤링: Spotify를 검색해 저장한다 (artist.sh의 웹 버전).
-// 아티스트 모드는 고른 아티스트의 전체 앨범을, 앨범 모드는 고른 앨범 1개를 수집한다.
-// 앨범 검색에는 장르 필터가 없으므로(Spotify가 앨범 단위 장르를 주지 않음) 관리자가 직접 선별한다.
+const ALBUM_TYPE_LABEL = { album: '정규', ep: 'EP', single: '싱글' } as const
+
+// 웹에서 바로 크롤링: Apple Music을 검색해 저장한다 (Spotify 계정이 막힌 동안의 수집 경로).
+// 아티스트 모드는 고른 아티스트의 전체 앨범 중 DB에 없는 것을, 앨범 모드는 고른 앨범 1개를 수집한다.
+// 앨범 검색 결과는 장르 무관이라 관리자가 직접 선별한다.
 export function CrawlTab() {
   const qc = useQueryClient()
-  // Configured credential pairs on the server (first/second/third/... env pairs).
-  const keysQuery = useQuery({ queryKey: ['spotify-keys'], queryFn: fetchSpotifyKeys, staleTime: Infinity })
-  const keys = keysQuery.data ?? []
-  const [picked, setPicked] = useState('')
-  const key = picked && keys.includes(picked) ? picked : (keys[0] ?? '') // '' = server default pair
-
   const [mode, setMode] = useState<Mode>('artist')
   const [input, setInput] = useState('')
   const q = useDebouncedValue(input.trim(), 350)
   const [message, setMessage] = useState('')
-  // 참여·컴필레이션 앨범(include_groups=appears_on,compilation)까지 수집할지.
+  // 참여·컴필레이션 앨범(appears-on-albums, compilation-albums 뷰)까지 수집할지.
   // 쇼미더머니류를 담을 때만 켜는 명시적 토글 — 노이즈가 많아 기본은 꺼짐.
   const [appearsOn, setAppearsOn] = useState(false)
   // DB에 이미 앨범이 있는 아티스트: 뭐가 들어있는지 팝업으로 확인하고 나서 다시 긁을지 정한다.
-  const [preview, setPreview] = useState<SpotifyArtistHit | null>(null)
+  const [preview, setPreview] = useState<AppleArtistHit | null>(null)
 
   const artistSearch = useQuery({
-    queryKey: ['spotify-search', q, key],
-    queryFn: () => searchSpotifyArtists(q, key),
+    queryKey: ['apple-artist-search', q],
+    queryFn: () => searchAppleArtists(q),
     enabled: mode === 'artist' && q.length > 0,
     staleTime: 60_000,
   })
   const albumSearch = useQuery({
-    queryKey: ['spotify-album-search', q, key],
-    queryFn: () => searchSpotifyAlbums(q, key),
+    queryKey: ['apple-album-search', q],
+    queryFn: () => searchAppleAlbums(q),
     enabled: mode === 'album' && q.length > 0,
     staleTime: 60_000,
   })
@@ -50,16 +44,16 @@ export function CrawlTab() {
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['artists'] })
     qc.invalidateQueries({ queryKey: ['albums'] })
-    qc.invalidateQueries({ queryKey: ['spotify-search'] })
-    qc.invalidateQueries({ queryKey: ['spotify-album-search'] })
+    qc.invalidateQueries({ queryKey: ['apple-artist-search'] })
+    qc.invalidateQueries({ queryKey: ['apple-album-search'] })
   }
 
   const crawl = useMutation({
-    mutationFn: (artistId: string) => crawlArtist(artistId, key, appearsOn),
+    mutationFn: (appleArtistId: string) => crawlAppleArtist({ appleArtistId }, appearsOn),
     onSuccess: (res) => {
       setMessage(
         res.saved
-          ? `✅ ${res.artist_name ?? '아티스트'}: 앨범 ${res.albums}개 저장 (크레딧 아티스트 ${res.artists ?? 0}명, 이미지 ${res.enriched ?? 0}개, 트랙 동기화 ${res.tracks_synced ?? 0}개)`
+          ? `✅ ${res.artist_name ?? '아티스트'}: 새 앨범 ${res.albums}개 저장 (이미 있음 ${res.existing ?? 0}개, 크레딧 아티스트 ${res.artists ?? 0}명)`
           : '앨범이 0개라 저장하지 않았습니다.',
       )
       invalidate()
@@ -68,10 +62,10 @@ export function CrawlTab() {
   })
 
   const addAlbum = useMutation({
-    mutationFn: (albumId: string) => crawlAlbum(albumId, key),
+    mutationFn: (appleAlbumId: string) => crawlAppleAlbum(appleAlbumId),
     onSuccess: (res) => {
       setMessage(
-        `✅ ${res.album_name}: 저장 (크레딧 아티스트 ${res.artists ?? 0}명, 이미지 ${res.enriched ?? 0}개, 트랙 동기화 ${res.tracks_synced ?? 0}개)` +
+        (res.existing ? `${res.album_name}: 이미 등록된 앨범입니다` : `✅ ${res.album_name}: 저장 (크레딧 아티스트 ${res.artists ?? 0}명)`) +
           (res.deleted ? ' — 삭제된 앨범이라 목록에 보이지 않습니다. 「삭제된 앨범」 탭에서 복구하세요.' : ''),
       )
       invalidate()
@@ -102,31 +96,14 @@ export function CrawlTab() {
           ))}
         </div>
 
-        {keys.length > 0 && (
-          <div className={styles.keyToggle} role="radiogroup" aria-label="Spotify API 키 선택">
-            {keys.map((k) => (
-              <button
-                key={k}
-                type="button"
-                role="radio"
-                aria-checked={key === k}
-                className={key === k ? `${styles.tab} ${styles.active}` : styles.tab}
-                onClick={() => setPicked(k)}
-              >
-                {k.toUpperCase()}
-              </button>
-            ))}
-          </div>
-        )}
-
         <div className={styles.searchForm}>
           <Search size={15} className={styles.searchIcon} aria-hidden />
           <input
             className={styles.searchInput}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={mode === 'artist' ? 'Spotify에서 아티스트 검색' : 'Spotify에서 앨범명 검색'}
-            aria-label={mode === 'artist' ? 'Spotify 아티스트 검색' : 'Spotify 앨범 검색'}
+            placeholder={mode === 'artist' ? 'Apple Music에서 아티스트 검색' : 'Apple Music에서 앨범명 검색'}
+            aria-label={mode === 'artist' ? 'Apple Music 아티스트 검색' : 'Apple Music 앨범 검색'}
           />
           {input && (
             <button type="button" className={styles.clearBtn} onClick={() => setInput('')} aria-label="검색어 지우기">
@@ -162,7 +139,7 @@ export function CrawlTab() {
                 <span className={styles.rowName} title={hit.name}>
                   {hit.name}
                 </span>
-                <span className={styles.rowId}>팔로워 {nf.format(hit.followers)}</span>
+                <span className={styles.rowId}>{hit.genres.join(', ') || '장르 정보 없음'}</span>
               </div>
               {hit.albums_in_db > 0 ? (
                 <button
@@ -204,7 +181,9 @@ export function CrawlTab() {
                   {hit.name}
                 </span>
                 <span className={styles.rowId}>
-                  {[hit.artists, hit.release_date?.slice(0, 4), `${hit.total_tracks}곡`].filter(Boolean).join(' · ')}
+                  {[hit.artists, hit.release_date?.slice(0, 4), ALBUM_TYPE_LABEL[hit.album_type], `${hit.total_tracks}곡`]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </span>
               </div>
               <span className={hit.in_db ? `${styles.dbBadge} ${styles.dbBadgeHas}` : styles.dbBadge}>
@@ -231,8 +210,8 @@ export function CrawlTab() {
       {!q && (
         <p className={styles.state}>
           {mode === 'artist'
-            ? '아티스트 이름으로 Spotify를 검색하세요.'
-            : '앨범명으로 Spotify를 검색하세요. artist:이름, year:2024 같은 조건도 붙일 수 있습니다.'}
+            ? '아티스트 이름으로 Apple Music을 검색하세요.'
+            : '앨범명으로 Apple Music을 검색하세요. 아티스트명을 함께 넣으면 더 정확합니다.'}
         </p>
       )}
 
@@ -243,7 +222,7 @@ export function CrawlTab() {
 
 // 검색 결과의 「DB n개」를 누르면 뜨는 미리보기 — 우리가 이미 가진 앨범을 보여준다.
 // 공개 목록과 같은 GET /albums?artist_id= 를 쓰므로 서버에 새 경로가 필요 없다.
-function ArtistAlbumsDialog({ artist, onClose }: { artist: SpotifyArtistHit; onClose: () => void }) {
+function ArtistAlbumsDialog({ artist, onClose }: { artist: AppleArtistHit; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     dialog.current?.showModal()
@@ -251,8 +230,8 @@ function ArtistAlbumsDialog({ artist, onClose }: { artist: SpotifyArtistHit; onC
 
   // 첫 페이지(40장)만 — 확인용 미리보기지 전체 목록이 아니다.
   const { data, isLoading, error } = useQuery({
-    queryKey: ['albums', { artistId: artist.id, preview: true }],
-    queryFn: () => fetchAlbums({ artistId: artist.id, offset: 0 }),
+    queryKey: ['albums', { artistId: artist.artist_id, preview: true }],
+    queryFn: () => fetchAlbums({ artistId: artist.artist_id ?? '', offset: 0 }),
   })
 
   return (

@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Clock, Disc3, Play, Square, Users } from 'lucide-react'
-import { fetchSpotifyKeys } from '@/features/crawl-artist'
+import { Clock, Disc3, Link2Off, Play, Square, Users } from 'lucide-react'
 import { checkReleases, fetchReleasesStatus } from '../api/releasesAdminApi'
 import styles from './AdminPage.module.css'
 
 const nf = new Intl.NumberFormat('ko-KR')
-const BATCH = 10 // 배치당 아티스트 수 — 서버가 아티스트당 Spotify 요청 1회
+const BATCH = 10 // 배치당 아티스트 수 — 서버가 아티스트당 Apple 요청 2회
 const LOG_MAX = 300
 
 interface LogLine {
@@ -16,15 +15,11 @@ interface LogLine {
 
 // 신보 체크 탭: DB 보유 아티스트의 새 앨범을 배치로 감지해 자동 추가한다
 // (2026-02 API 개편으로 사라진 new-releases의 로스터 기반 대체). 트랙 동기화
-// 탭과 같은 실행 계약 — 남은 아티스트가 0이 되거나, 중지를 누르거나, Spotify
+// 탭과 같은 실행 계약 — 남은 아티스트가 0이 되거나, 중지를 누르거나, Apple
 // 오류가 나면 멈춘다. 20시간 주기라 매일 한 번 돌리면 어제 확인분부터 다시 돈다.
 export function ReleasesTab() {
   const qc = useQueryClient()
   const status = useQuery({ queryKey: ['releases-status'], queryFn: fetchReleasesStatus })
-  const keysQuery = useQuery({ queryKey: ['spotify-keys'], queryFn: fetchSpotifyKeys, staleTime: Infinity })
-  const keys = keysQuery.data ?? []
-  const [picked, setPicked] = useState('')
-  const key = picked && keys.includes(picked) ? picked : (keys[0] ?? '') // '' = server default pair
 
   const [running, setRunning] = useState(false)
   const [stopping, setStopping] = useState(false)
@@ -49,7 +44,7 @@ export function ReleasesTab() {
     let albums = 0
     try {
       for (;;) {
-        const res = await checkReleases(key, BATCH)
+        const res = await checkReleases(BATCH)
         checked += res.checked
         albums += res.new_albums
         if (res.artists.length > 0) {
@@ -66,6 +61,9 @@ export function ReleasesTab() {
           qc.invalidateQueries({ queryKey: ['artists'] })
         } else if (res.checked > 0) {
           pushLog([{ kind: 'info', text: `${res.checked}명 확인 — 신보 없음` }])
+        }
+        if (res.unlinked?.length) {
+          pushLog([{ kind: 'warn', text: `Apple 아티스트를 못 찾아 건너뜀: ${res.unlinked.join(', ')}` }])
         }
         qc.invalidateQueries({ queryKey: ['releases-status'] })
         if (res.error) {
@@ -105,6 +103,7 @@ export function ReleasesTab() {
     ? [
         { label: '대상 아티스트', value: s.artists, Icon: Users },
         { label: '확인 대기', value: s.stale, Icon: Clock },
+        { label: 'Apple 미연결', value: s.unlinked, Icon: Link2Off },
       ]
     : []
 
@@ -127,24 +126,6 @@ export function ReleasesTab() {
       )}
 
       <div className={styles.crawlControls}>
-        {keys.length > 0 && (
-          <div className={styles.keyToggle} role="radiogroup" aria-label="Spotify API 키 선택">
-            {keys.map((k) => (
-              <button
-                key={k}
-                type="button"
-                role="radio"
-                aria-checked={key === k}
-                disabled={running}
-                className={key === k ? `${styles.tab} ${styles.active}` : styles.tab}
-                onClick={() => setPicked(k)}
-              >
-                {k.toUpperCase()}
-              </button>
-            ))}
-          </div>
-        )}
-
         {running ? (
           <button
             type="button"
@@ -195,8 +176,9 @@ export function ReleasesTab() {
       )}
       <p className={styles.state}>
         <Disc3 size={13} aria-hidden style={{ verticalAlign: '-2px', marginRight: 4 }} />
-        신보 감시가 켜진 아티스트만 확인합니다 (아티스트 상세의 「신보 감시」 버튼으로 관리). 아티스트당 Spotify
-        앨범 목록 첫 페이지(최신 10장)를 비교해 DB에 없는 앨범만 추가하며, 삭제한 앨범은 되살리지 않습니다.
+        신보 감시가 켜진 아티스트만 확인합니다 (아티스트 상세의 「신보 감시」 버튼으로 관리). 아티스트당 Apple
+        Music 정규·싱글 목록의 최신 10장씩을 비교해 DB에 없는 앨범만 추가하며, 삭제한 앨범은 되살리지 않습니다.
+        Apple에 연결되지 않은 아티스트는 이름으로 찾아 연결하고, 못 찾으면 건너뜁니다.
       </p>
     </div>
   )
