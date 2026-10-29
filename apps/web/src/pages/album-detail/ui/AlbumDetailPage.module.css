@@ -419,3 +419,8 @@
   line-height: 1.55;
   white-space: pre-line;
 }
+
+/* Apple 공식 앨범 임베드 높이. 모바일 .embed 축소보다 뒤에 둬야 덮어쓴다 */
+.appleEmbed {
+  height: 450px;
+}
