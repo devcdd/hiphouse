@@ -474,10 +474,10 @@
       "get": {
         "tags": ["artists"],
         "summary": "신보 체크 현황 (관리자)",
-        "description": "artists = 신보 감시(releases_watch)가 켜진 체크 대상 아티스트 수, stale = 이번 주기(20시간) 내 아직 확인하지 않은 아티스트 수.",
+        "description": "artists = 신보 감시(releases_watch)가 켜진 체크 대상 아티스트 수, stale = 이번 주기(20시간) 내 아직 확인하지 않은 아티스트 수, unlinked = 그중 apple_id가 없는 아티스트 수. Spotify·Apple 신보 체크가 같이 쓴다.",
         "responses": {
-          "200": { "description": "{artists, stale}", "content": { "application/json": { "schema": { "type": "object", "properties": {
-            "artists": { "type": "integer" }, "stale": { "type": "integer" }
+          "200": { "description": "{artists, stale, unlinked}", "content": { "application/json": { "schema": { "type": "object", "properties": {
+            "artists": { "type": "integer" }, "stale": { "type": "integer" }, "unlinked": { "type": "integer" }
           } } } } }
         }
       }
@@ -499,32 +499,102 @@
         }
       }
     },
-    "/admin/apple/status": {
+    "/admin/apple/artists": {
       "get": {
-        "tags": ["albums"],
-        "summary": "Apple Music 연동 현황 (관리자)",
-        "description": "삭제되지 않은 앨범 기준. albums = 앨범 수, linked = apple_id가 붙은 앨범 수, pending = 아직 Apple에 조회하지 않은 앨범 수, artists_linked = apple_id가 붙은 아티스트 수. configured = 서버에 APPLE_MUSIC_* 설정 여부.",
+        "tags": ["artists"],
+        "summary": "Apple Music 아티스트 검색 (관리자 크롤링용)",
+        "description": "Apple 검색 후보(최대 25명)에 apple_id로 연결된 DB 아티스트 id와 그 아티스트의 live 앨범 수를 붙여 반환.",
+        "parameters": [ { "name": "q", "in": "query", "required": true, "schema": { "type": "string" } } ],
         "responses": {
-          "200": { "description": "{configured, albums, linked, pending, artists_linked}", "content": { "application/json": { "schema": { "type": "object", "properties": {
-            "configured": { "type": "boolean" }, "albums": { "type": "integer" }, "linked": { "type": "integer" },
-            "pending": { "type": "integer" }, "artists_linked": { "type": "integer" }
-          } } } } }
+          "200": {
+            "description": "후보 배열",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "type": "object", "properties": {
+              "id": { "type": "string", "description": "Apple 아티스트 id" }, "name": { "type": "string" },
+              "image_url": { "type": "string", "nullable": true },
+              "genres": { "type": "array", "items": { "type": "string" } },
+              "artist_id": { "type": "string", "nullable": true, "description": "연결된 DB 아티스트 id" },
+              "albums_in_db": { "type": "integer" }
+            } } } } }
+          },
+          "400": { "description": "q 누락 또는 APPLE_MUSIC_* 미설정" },
+          "502": { "description": "Apple API 오류", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
       }
     },
-    "/admin/apple/link": {
+    "/admin/apple/crawl": {
       "post": {
-        "tags": ["albums"],
-        "summary": "Apple Music 연동 배치 실행 (관리자)",
-        "description": "미조회 앨범을 최신 발매순으로 최대 limit개 골라 Apple 카탈로그를 조회하고 (UPC 있으면 filter[upc] 25개당 요청 1회, 없으면 대표 아티스트+앨범명 검색 후 발매일·트랙 수 일치 검증 — 앨범당 2회) apple_id·label·genres를 채운다. 앨범의 크레딧 아티스트는 이름(name·display_name·aliases, 단독 크레딧이면 무조건)으로 Apple 아티스트와 맞춰 apple_id·genres를 채운다. 앨범·아티스트·트랙의 display_name이 비어 있고 Apple 한글 표기가 Spotify 이름과 다르면 채운다 (관리자 입력값은 유지). 트랙은 양쪽 트랙 수가 같을 때 (disc, track) 위치로 맞춘다. 조회한 앨범은 미발견이어도 apple_checked_at을 찍어 다시 집지 않는다. Apple 오류 시 배치를 중단하고 진행분과 함께 error로 보고. remaining이 0이 될 때까지 반복 호출. 크롤·신보 체크가 새 앨범을 넣을 때는 자동으로 같은 연결을 수행한다.",
+        "tags": ["artists"],
+        "summary": "아티스트 앨범 크롤 — Apple Music (관리자)",
+        "description": "Apple 아티스트의 정규(full-albums)·싱글/EP(singles) 뷰 전체를 받아, DB에 없는 앨범만 크레딧·트랙과 함께 저장한다 (apple_id → UPC → 발매일+이름 순으로 기존 앨범 판별, 소프트 삭제 행도 기존으로 봄). 새 앨범·아티스트의 PK는 \"am\"+Apple id. 크레딧 아티스트는 apple_id → 미연결 기존 아티스트의 이름·표시 이름·연관검색어(정확히 1명) → 신규 순으로 맞춘다. artist_id(DB id)로 호출하면 그 아티스트의 apple_id를 쓴다. 앨범 0개면 아무것도 저장하지 않음. appears_on=true면 참여·컴필레이션 뷰까지 포함.",
         "requestBody": {
           "required": true,
           "content": { "application/json": { "schema": { "type": "object", "properties": {
-            "limit": { "type": "integer", "default": 50, "minimum": 1, "maximum": 100 }
+            "apple_artist_id": { "type": "string" },
+            "artist_id": { "type": "string", "description": "apple_artist_id 대신 DB 아티스트 id" },
+            "appears_on": { "type": "boolean", "default": false }
           } } } }
         },
         "responses": {
-          "200": { "description": "{checked, linked, artists_linked, named, remaining, error?}" },
+          "200": { "description": "크롤 결과 {albums(새로 저장), existing(이미 있음), saved, artist_name, artists, tracks_synced}" },
+          "400": { "description": "대상 누락, Apple 미연결 아티스트, 또는 APPLE_MUSIC_* 미설정" },
+          "502": { "description": "Apple API 오류 (그 전까지 저장된 앨범은 유지)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/admin/apple/albums": {
+      "get": {
+        "tags": ["albums"],
+        "summary": "Apple Music 앨범 검색 (관리자 크롤링용)",
+        "description": "앨범명으로 Apple을 검색해 후보(최대 25개)를 반환. album_type은 Apple 등록 유형(album/ep/single), in_db/deleted는 DB 보유·소프트 삭제 여부.",
+        "parameters": [ { "name": "q", "in": "query", "required": true, "schema": { "type": "string" } } ],
+        "responses": {
+          "200": {
+            "description": "후보 배열",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "type": "object", "properties": {
+              "id": { "type": "string", "description": "Apple 앨범 id" }, "name": { "type": "string" },
+              "image_url": { "type": "string", "nullable": true },
+              "release_date": { "type": "string", "nullable": true },
+              "album_type": { "type": "string", "enum": ["album", "ep", "single"] },
+              "total_tracks": { "type": "integer" },
+              "artists": { "type": "string" },
+              "in_db": { "type": "boolean" }, "deleted": { "type": "boolean" }
+            } } } } }
+          },
+          "502": { "description": "Apple API 오류", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/admin/apple/crawl-album": {
+      "post": {
+        "tags": ["albums"],
+        "summary": "앨범 단건 추가 — Apple Music (관리자)",
+        "description": "Apple 앨범 1개를 아티스트 크롤과 같은 경로로 저장. 이미 DB에 있으면 저장하지 않고 existing=true와 그 행의 album_id·deleted를 돌려준다.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "required": ["album_id"], "properties": {
+            "album_id": { "type": "string", "description": "Apple 앨범 id" }
+          } } } }
+        },
+        "responses": {
+          "200": { "description": "추가 결과 {album_id, album_name, saved, existing?, deleted?, artists?, tracks_synced?}" },
+          "404": { "description": "Apple에 없는 앨범" },
+          "502": { "description": "Apple API 오류", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/admin/apple/check-releases": {
+      "post": {
+        "tags": ["artists"],
+        "summary": "신보 감지 배치 실행 — Apple Music (관리자)",
+        "description": "/admin/spotify/check-releases의 Apple 판 (서버 자동 스윕도 이 경로를 쓴다). 감시 아티스트를 오래 안 본 순서대로 최대 limit명 골라 full-albums·singles 뷰의 최신 10장씩을 보고 DB에 없는 앨범만 크레딧·트랙과 함께 저장. apple_id가 없는 아티스트는 이름(name·display_name·aliases)으로 Apple 검색해 연결하고, 못 찾으면 확인 스탬프만 찍고 unlinked로 보고한다. Apple 오류 시 배치를 중단하고 진행분과 함께 error로 보고. remaining이 0이 될 때까지 반복 호출.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "properties": {
+            "limit": { "type": "integer", "default": 10, "minimum": 1, "maximum": 50 }
+          } } } }
+        },
+        "responses": {
+          "200": { "description": "{checked, new_albums, tracks_synced, remaining, artists:[{id,name,albums:[이름]}], unlinked?:[이름], error?}" },
           "400": { "description": "APPLE_MUSIC_* 미설정" }
         }
       }

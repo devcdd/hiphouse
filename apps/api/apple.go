@@ -164,34 +164,46 @@ func (s *server) amGet(ctx context.Context, path string, dst any) error {
 
 // ---- Apple payload shapes (only the fields we use) ----
 
+// amArtwork.URL은 "{w}x{h}bb.jpg" 템플릿이다 (amArtURL이 크기를 채운다).
+type amArtwork struct {
+	URL string `json:"url"`
+}
+
 type amArtist struct {
 	ID         string `json:"id"`
 	Attributes struct {
-		Name       string   `json:"name"`
-		GenreNames []string `json:"genreNames"`
+		Name       string    `json:"name"`
+		GenreNames []string  `json:"genreNames"`
+		Artwork    amArtwork `json:"artwork"`
 	} `json:"attributes"`
 }
 
 type amTrack struct {
 	ID         string `json:"id"`
 	Attributes struct {
-		Name        string `json:"name"`
-		DiscNumber  int    `json:"discNumber"`
-		TrackNumber int    `json:"trackNumber"`
+		Name             string `json:"name"`
+		DiscNumber       int    `json:"discNumber"`
+		TrackNumber      int    `json:"trackNumber"`
+		DurationInMillis int    `json:"durationInMillis"`
+		ContentRating    string `json:"contentRating"`
+		ArtistName       string `json:"artistName"`
 	} `json:"attributes"`
 }
 
 type amAlbum struct {
 	ID         string `json:"id"`
 	Attributes struct {
-		Name           string   `json:"name"`
-		UPC            string   `json:"upc"`
-		RecordLabel    string   `json:"recordLabel"`
-		GenreNames     []string `json:"genreNames"`
-		ReleaseDate    string   `json:"releaseDate"`
-		TrackCount     int      `json:"trackCount"`
-		Copyright      string   `json:"copyright"`
-		ContentRating  string   `json:"contentRating"`
+		Name           string    `json:"name"`
+		ArtistName     string    `json:"artistName"`
+		Artwork        amArtwork `json:"artwork"`
+		IsCompilation  bool      `json:"isCompilation"`
+		UPC            string    `json:"upc"`
+		RecordLabel    string    `json:"recordLabel"`
+		GenreNames     []string  `json:"genreNames"`
+		ReleaseDate    string    `json:"releaseDate"`
+		TrackCount     int       `json:"trackCount"`
+		Copyright      string    `json:"copyright"`
+		ContentRating  string    `json:"contentRating"`
 		EditorialNotes struct {
 			Short    string `json:"short"`
 			Standard string `json:"standard"`
@@ -720,51 +732,4 @@ func (s *server) sweepApple(ctx context.Context) {
 		}
 	}
 	log.Printf("apple sweep: 상한 도달 — %d개 조회, 앨범 %d개·아티스트 %d명 연결, 이름 %d개 (다음 스윕에 계속)", total.Checked, total.Linked, total.ArtistsLinked, total.Named)
-}
-
-// GET /admin/apple/status
-func (s *server) adminAppleStatus(w http.ResponseWriter, r *http.Request) {
-	var albums, linked, pending, artists int
-	if err := s.db.QueryRow(r.Context(),
-		`SELECT COUNT(*)::int, COUNT(apple_id)::int,
-		        COUNT(*) FILTER (WHERE apple_id IS NULL AND apple_checked_at IS NULL)::int
-		 FROM albums WHERE deleted_at IS NULL`).Scan(&albums, &linked, &pending); err != nil {
-		writeErr(w, 500, err.Error())
-		return
-	}
-	if err := s.db.QueryRow(r.Context(), "SELECT COUNT(apple_id)::int FROM artists").Scan(&artists); err != nil {
-		writeErr(w, 500, err.Error())
-		return
-	}
-	writeJSON(w, 200, map[string]any{
-		"configured": appleConfigured(), "albums": albums, "linked": linked, "pending": pending, "artists_linked": artists,
-	})
-}
-
-// POST /admin/apple/link {limit} — 트랙 백필과 같은 배치 계약: remaining이 0이
-// 될 때까지 반복 호출.
-func (s *server) adminAppleLink(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Limit int `json:"limit"`
-	}
-	if !decode(w, r, &body) {
-		return
-	}
-	if !appleConfigured() {
-		writeErr(w, 400, "APPLE_MUSIC_* 환경변수가 설정되지 않았습니다")
-		return
-	}
-	if body.Limit < 1 || body.Limit > 100 {
-		body.Limit = 50
-	}
-	if _, err := s.backfillAppleTypes(r.Context(), body.Limit); err != nil {
-		writeErr(w, 502, "apple_type 백필 실패: "+err.Error())
-		return
-	}
-	res, err := s.appleLinkBatch(r.Context(), body.Limit)
-	if err != nil {
-		writeErr(w, 500, err.Error())
-		return
-	}
-	writeJSON(w, 200, res)
 }

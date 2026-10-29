@@ -34,7 +34,8 @@ func (s *server) scheduleReleaseSweep(ctx context.Context) {
 			return
 		case <-t.C:
 		}
-		s.sweepReleases(ctx)
+		// Spotify 계정이 막혀 신보 감지는 Apple로 돈다. 복구되면 sweepReleases로 되돌린다.
+		s.sweepAppleReleases(ctx)
 		s.sweepApple(ctx)
 	}
 }
