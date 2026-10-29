@@ -11,6 +11,7 @@ import { ReportButton } from '@/features/report-album'
 import { EditDisplayNameButton } from '@/features/edit-display-name'
 import { EditAlbumInfoButton } from '@/features/edit-album-info'
 import { AwardSection } from '@/features/awards'
+import { useResolvedTheme } from '@/features/theme'
 import { startKakaoLogin } from '@/features/auth'
 import { apiDelete, apiPost } from '@/shared/api/client'
 import { displayName } from '@/shared/lib/displayName'
@@ -27,6 +28,7 @@ export function AlbumDetailPage() {
   const navigate = useNavigate()
   const { data: album, isLoading: loading, error } = useAlbum(id)
   const { isAuthed, isAdmin } = useAuth()
+  const theme = useResolvedTheme() // Apple 임베드는 ?theme=만 읽어 테마가 바뀌면 src 변경으로 다시 불러온다
   const favIds = useFavoriteIds(isAuthed)
   const ratings = useRatingMap(isAuthed)
   // 트랙리스트는 기본 접힘 — 펼칠 때 처음 fetch (useAlbumTracks enabled).
@@ -151,8 +153,8 @@ export function AlbumDetailPage() {
           ) : (
             <iframe
               title="Apple Music tracklist"
-              className={styles.embed}
-              src={`https://embed.music.apple.com/kr/album/${encodeURIComponent(album.apple_id)}`}
+              className={`${styles.embed} ${styles.appleEmbed}`}
+              src={`https://embed.music.apple.com/kr/album/${encodeURIComponent(album.apple_id)}?theme=${theme}`}
               loading="lazy"
               allow="autoplay *; encrypted-media *; clipboard-write"
               sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-storage-access-by-user-activation allow-top-navigation-by-user-activation"
