@@ -684,10 +684,12 @@ const releaseEligibleSQL = `FROM artists a WHERE a.releases_watch`
 const releaseStaleSQL = releaseEligibleSQL +
 	` AND (a.releases_checked_at IS NULL OR a.releases_checked_at < now() - interval '20 hours')`
 
-// GET /admin/spotify/releases-status — 신보 체크 현황 (대상/이번 주기 대기).
+// GET /admin/spotify/releases-status — 신보 체크 현황 (대상/이번 주기 대기/Apple 미연결).
+// 경로는 Spotify 시절 그대로지만 대상 SQL은 소스 무관이라 Apple 신보 체크도 같이 쓴다.
 func (s *server) adminReleasesStatus(w http.ResponseWriter, r *http.Request) {
-	var artists, stale int
-	if err := s.db.QueryRow(r.Context(), "SELECT COUNT(*)::int "+releaseEligibleSQL).Scan(&artists); err != nil {
+	var artists, stale, unlinked int
+	if err := s.db.QueryRow(r.Context(),
+		"SELECT COUNT(*)::int, (COUNT(*) FILTER (WHERE a.apple_id IS NULL))::int "+releaseEligibleSQL).Scan(&artists, &unlinked); err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
@@ -695,7 +697,7 @@ func (s *server) adminReleasesStatus(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	writeJSON(w, 200, map[string]int{"artists": artists, "stale": stale})
+	writeJSON(w, 200, map[string]int{"artists": artists, "stale": stale, "unlinked": unlinked})
 }
 
 type releaseCheckItem struct {
@@ -705,12 +707,13 @@ type releaseCheckItem struct {
 }
 
 type releaseCheckResult struct {
-	Checked      int                `json:"checked"`   // 이번 배치에서 확인한 아티스트 수
+	Checked      int                `json:"checked"` // 이번 배치에서 확인한 아티스트 수
 	NewAlbums    int                `json:"new_albums"`
 	Enriched     int                `json:"enriched"`
 	TracksSynced int                `json:"tracks_synced"`
-	Remaining    int                `json:"remaining"` // 이번 주기에 아직 안 본 아티스트 수
-	Artists      []releaseCheckItem `json:"artists"`   // 신보가 있던 아티스트만
+	Remaining    int                `json:"remaining"`          // 이번 주기에 아직 안 본 아티스트 수
+	Artists      []releaseCheckItem `json:"artists"`            // 신보가 있던 아티스트만
+	Unlinked     []string           `json:"unlinked,omitempty"` // Apple 신보 체크: apple_id를 못 찾아 건너뛴 아티스트
 	Error        *string            `json:"error,omitempty"`
 }
 

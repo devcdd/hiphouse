@@ -159,9 +159,12 @@ func main() {
 	mux.HandleFunc("GET /admin/spotify/releases-status", s.requireAdmin(s.adminReleasesStatus))
 	mux.HandleFunc("POST /admin/spotify/check-releases", s.requireAdmin(s.adminCheckReleases))
 
-	// Admin Apple Music 연동 — UPC로 Apple 앨범을 찾아 레이블·장르·apple_id 백필
-	mux.HandleFunc("GET /admin/apple/status", s.requireAdmin(s.adminAppleStatus))
-	mux.HandleFunc("POST /admin/apple/link", s.requireAdmin(s.adminAppleLink))
+	// Admin Apple Music 크롤링 — Spotify 계정이 막힌 동안 관리자 페이지가 쓰는 수집 경로
+	mux.HandleFunc("GET /admin/apple/artists", s.requireAdmin(s.adminAppleArtistSearch))
+	mux.HandleFunc("POST /admin/apple/crawl", s.requireAdmin(s.adminAppleCrawl))
+	mux.HandleFunc("GET /admin/apple/albums", s.requireAdmin(s.adminAppleAlbumSearch))
+	mux.HandleFunc("POST /admin/apple/crawl-album", s.requireAdmin(s.adminAppleCrawlAlbum))
+	mux.HandleFunc("POST /admin/apple/check-releases", s.requireAdmin(s.adminAppleCheckReleases))
 
 	// Admin 트랙 동기화 — batch-backfill track lists for albums that lack them
 	mux.HandleFunc("GET /admin/tracks/status", s.requireAdmin(s.adminTracksStatus))
