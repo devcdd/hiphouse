@@ -138,14 +138,26 @@ export function AlbumDetailPage() {
       {album && (
         <section className={styles.tracks}>
           <h2 className={styles.tracksTitle}>트랙리스트</h2>
-          {/* 일반/미로그인 사용자에게 보여주는 건 Spotify 임베드뿐 — 실제 재생 가능한 목록. */}
-          <iframe
-            title="Spotify tracklist"
-            className={styles.embed}
-            src={`https://open.spotify.com/embed/album/${encodeURIComponent(album.id)}?theme=0`}
-            loading="lazy"
-            allow="encrypted-media"
-          />
+          {/* 일반/미로그인 사용자에게 보여주는 건 스트리밍 임베드뿐 — 실제 재생 가능한 목록.
+              Apple 크롤로 들어온 앨범은 Spotify ID가 없어 Apple Music 임베드를 쓴다. */}
+          {album.spotify_url || !album.apple_id ? (
+            <iframe
+              title="Spotify tracklist"
+              className={styles.embed}
+              src={`https://open.spotify.com/embed/album/${encodeURIComponent(album.id)}?theme=0`}
+              loading="lazy"
+              allow="encrypted-media"
+            />
+          ) : (
+            <iframe
+              title="Apple Music tracklist"
+              className={styles.embed}
+              src={`https://embed.music.apple.com/kr/album/${encodeURIComponent(album.apple_id)}`}
+              loading="lazy"
+              allow="autoplay *; encrypted-media *; clipboard-write"
+              sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-storage-access-by-user-activation allow-top-navigation-by-user-activation"
+            />
+          )}
           {/* 우리 DB 트랙 목록은 표시 이름 편집용 — 관리자만 마운트되므로 fetch도 안 나간다. */}
           {isAdmin && (
             <details className={styles.adminTracks} onToggle={(e) => setTracksOpen(e.currentTarget.open)}>
