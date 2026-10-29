@@ -507,8 +507,14 @@ func (s *server) adminAppleCrawl(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, 400, "Apple Music에 연결되지 않은 아티스트입니다 — 관리자 크롤링 탭에서 Apple 아티스트를 검색해 가져오세요")
 			return
 		}
-		appleID = *aid
+		appleID, err := s.verifyAppleArtist(ctx, body.ArtistID, *aid)
+		if err != nil {
+			writeErr(w, 502, err.Error())
+			return
+		}
+		body.AppleArtistID = appleID
 	}
+	appleID = body.AppleArtistID
 	if appleID == "" {
 		writeErr(w, 400, "apple_artist_id 또는 artist_id가 필요합니다")
 		return
@@ -695,6 +701,55 @@ func (s *server) adminAppleCrawlAlbum(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// verifyAppleArtist — 저장된 apple_id가 진짜 이 아티스트인지, UPC 등으로 연결된 기존 앨범의
+// Apple 크레딧으로 확인한다. 예전 이름 매칭 연결이 동명이인(해외 "Iron", "MINOS")을 붙여
+// 둔 경우가 있어서, 현재 id가 앨범 절반 미만에만 있고 다른 한 명이 절반 넘게 있으면 그쪽으로
+// 고쳐 돌려준다. 협업 상대에게 넘어가지 않도록 동률은 그대로 두고, 이미 다른 DB 아티스트가
+// 쓰는 id(비프리 ↔ 부캐 등)로는 바꾸지 않는다. 연결 앨범이 2장 미만이면 근거가 없어 그대로 둔다.
+func (s *server) verifyAppleArtist(ctx context.Context, artistID, appleID string) (string, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT al.apple_id FROM album_artists aa JOIN albums al ON al.id = aa.album_id
+		 WHERE aa.artist_id = $1 AND al.apple_id IS NOT NULL AND NOT starts_with(al.id, $2)
+		 ORDER BY aa.position, al.release_date DESC NULLS LAST LIMIT $3`, artistID, amIDPrefix, amUPCBatch)
+	if err != nil {
+		return "", err
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil || len(ids) < 2 {
+		return appleID, err
+	}
+	var page struct {
+		Data []amAlbum `json:"data"`
+	}
+	q := url.Values{"ids": {strings.Join(ids, ",")}, "include": {"artists"}, "l": {"ko"}}
+	if err := s.amGet(ctx, "albums?"+q.Encode(), &page); err != nil {
+		return "", err
+	}
+	votes := map[string]int{}
+	for _, al := range page.Data {
+		for _, a := range al.Relationships.Artists.Data {
+			votes[a.ID]++
+		}
+	}
+	n := len(page.Data)
+	best := ""
+	for id, v := range votes {
+		if id != appleID && v*2 > n && (best == "" || v > votes[best]) {
+			best = id
+		}
+	}
+	if best == "" || votes[appleID]*2 >= n {
+		return appleID, nil
+	}
+	var taken bool
+	if err := s.db.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM artists WHERE apple_id=$1 AND id<>$2)", best, artistID).Scan(&taken); err != nil || taken {
+		return appleID, err
+	}
+	log.Printf("apple: 아티스트 %s apple_id 교정 %s → %s (기존 앨범 크레딧 %d/%d)", artistID, appleID, best, votes[best], len(page.Data))
+	_, err = s.db.Exec(ctx, "UPDATE artists SET apple_id=$2 WHERE id=$1", artistID, best)
+	return best, err
+}
+
 // findAppleArtist — apple_id 없는 감시 아티스트를 Apple에 연결한다. l=ko 응답은 한글
 // 표기라 영문 name만으론 안 맞는 경우가 많아 display_name·연관검색어까지 대조하고, 이름이
 // 맞는 후보가 없으면 첫 검색 결과의 최신 디스코그래피가 이 아티스트의 DB 앨범과 2장 이상
@@ -806,6 +861,13 @@ func (s *server) checkAppleReleasesBatch(ctx context.Context, limit int) (releas
 				}
 				res.Checked++
 				continue
+			}
+			c.AppleID = &aid
+		} else {
+			aid, err := s.verifyAppleArtist(ctx, c.ID, *c.AppleID)
+			if err != nil {
+				res.Error = strPtr(fmt.Sprintf("%s: %v", label(c), err))
+				break
 			}
 			c.AppleID = &aid
 		}
