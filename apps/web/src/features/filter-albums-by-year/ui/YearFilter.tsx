@@ -39,6 +39,8 @@ export function YearFilter({ years, value, onChange }: Props) {
       modules={[FreeMode, Mousewheel]}
       freeMode={{ enabled: true, momentum: true }}
       mousewheel={{ forceToAxis: true }}
+      // 기본값엔 button이 있어, 포커스된 칩을 잡고 끌면 Swiper가 시작 위치를 0으로 잡아 맨 앞으로 튄다(swiper 14.0.6).
+      focusableElements="input, select, option, textarea, video, label"
       grabCursor
       slidesPerView="auto"
       spaceBetween={8}
