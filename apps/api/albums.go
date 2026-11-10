@@ -298,8 +298,9 @@ func (s *server) listAlbums(w http.ResponseWriter, r *http.Request) {
 }
 
 // listYears returns distinct album years, newest first — powers the UI year filter.
+// 삭제된 앨범만 남은 연도는 빈 필터 태그가 되므로 뺀다.
 func (s *server) listYears(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.db.Query(r.Context(), "SELECT DISTINCT year FROM albums WHERE year IS NOT NULL ORDER BY year DESC")
+	rows, err := s.db.Query(r.Context(), "SELECT DISTINCT year FROM albums WHERE year IS NOT NULL AND deleted_at IS NULL ORDER BY year DESC")
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
