@@ -20,11 +20,8 @@ func TestNextSweep(t *testing.T) {
 		if got.Hour() != sweepHour || got.Minute() != sweepMinute {
 			t.Fatalf("now=%s: %s는 06:05가 아님", now, got)
 		}
-		if (got.Unix()/86400)%sweepDays != 0 {
-			t.Fatalf("now=%s: %s는 이틀 주기가 아님", now, got)
-		}
-		if d := got.Sub(now); d > 48*time.Hour {
-			t.Fatalf("now=%s: 대기 %s가 2일 초과", now, d)
+		if d := got.Sub(now); d > 24*time.Hour {
+			t.Fatalf("now=%s: 대기 %s가 하루 초과", now, d)
 		}
 		if !prev.IsZero() && got.Before(prev) {
 			t.Fatalf("단조 증가 위반: %s < %s", got, prev)
