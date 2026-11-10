@@ -14,6 +14,12 @@ interface Props {
   onChange: (year: YearOption) => void
 }
 
+// 선택 칩 앞에 칩 하나를 온전히, 그 앞 칩은 반만 걸치게 남긴다. 잘린 칩이 앞쪽에도 연도가 더 있다는 신호가 된다.
+function leadingOffset(s: SwiperClass, i: number): number {
+  if (i < 2) return 0
+  return s.slidesGrid[i - 2] + s.slidesSizesGrid[i - 2] / 2
+}
+
 // Horizontal year strip on Swiper: drag + flick-momentum (freeMode), horizontal
 // wheel, grab cursor. Swiper also suppresses the click that ends a drag.
 export function YearFilter({ years, value, onChange }: Props) {
@@ -28,7 +34,9 @@ export function YearFilter({ years, value, onChange }: Props) {
     const i = years.indexOf(value)
     if (i < 0) return
     scrolledTo.current = value
-    swiperRef.current?.slideTo(i)
+    const s = swiperRef.current
+    if (!s) return
+    s.translateTo(-leadingOffset(s, i), s.params.speed)
   }, [value, years])
 
   return (
