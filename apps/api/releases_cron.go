@@ -7,13 +7,12 @@ import (
 	_ "time/tzdata" // distroless 이미지엔 zoneinfo가 없다 — Asia/Seoul을 바이너리에 넣는다
 )
 
-// 서버 자체 신보 스윕: 이틀에 한 번 06:05 KST (신보가 00시 정각에 다 올라오진
+// 서버 자체 신보 스윕: 매일 06:05 KST (신보가 00시 정각에 다 올라오진
 // 않아 5분 여유). 관리자가 신보 체크 탭을 열지 않아도 돌게 하는 것이 목적이고,
 // 탭은 수동 실행용으로 그대로 둔다.
 const (
 	sweepHour   = 6
 	sweepMinute = 5
-	sweepDays   = 2
 	sweepBatch  = 20
 )
 
@@ -40,11 +39,11 @@ func (s *server) scheduleReleaseSweep(ctx context.Context) {
 	}
 }
 
-// nextSweep은 now 이후 첫 sweepHour:sweepMinute 중 UTC 일련일이 sweepDays로
-// 나눠떨어지는 날을 고른다. 재시작해도 같은 날짜에 걸리도록 벽시계만 보고 정한다 (상태 없음).
+// nextSweep은 now 이후 첫 sweepHour:sweepMinute를 고른다. 벽시계만 보고 정해서
+// 재시작해도 실행 시각이 밀리지 않는다 (상태 없음).
 func nextSweep(now time.Time) time.Time {
 	t := time.Date(now.Year(), now.Month(), now.Day(), sweepHour, sweepMinute, 0, 0, now.Location())
-	for !t.After(now) || (t.Unix()/86400)%sweepDays != 0 {
+	if !t.After(now) {
 		t = t.AddDate(0, 0, 1)
 	}
 	return t
