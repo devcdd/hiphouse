@@ -5,3 +5,4 @@ export { fetchArtists, updateArtistAliases, updateArtistDisplayName, updateArtis
 export type { DeleteMode } from './api/artistApi'
 export { ArtistCard } from './ui/ArtistCard'
 export { ArtistCardSkeleton } from './ui/ArtistCardSkeleton'
+export { ArtistCombobox } from './ui/ArtistCombobox'
