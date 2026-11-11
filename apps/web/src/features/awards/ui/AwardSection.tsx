@@ -94,6 +94,7 @@ export function AwardSection({ kind, id }: { kind: AwardKind; id: string }) {
       {adding && (
         <form
           className={styles.form}
+          onKeyDown={(e) => e.key === 'Escape' && setAdding(false)}
           onSubmit={(e) => {
             e.preventDefault()
             add.mutate()

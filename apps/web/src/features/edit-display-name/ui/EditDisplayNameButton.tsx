@@ -67,6 +67,7 @@ export function EditDisplayNameButton({
   return (
     <form
       className={styles.form}
+      onKeyDown={(e) => e.key === 'Escape' && setEditing(false)}
       onSubmit={(e) => {
         e.preventDefault()
         save.mutate()
