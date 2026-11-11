@@ -49,6 +49,11 @@ export function updateAlbumInfo(id: string, body: AlbumInfoPatch): Promise<void>
   return apiPut<void>(`/albums/${encodeURIComponent(id)}/info`, body)
 }
 
+// Admin: 크레딧 아티스트를 순서대로 교체. 저장 후엔 재동기화가 크레딧을 되돌리지 않는다.
+export function updateAlbumArtists(id: string, artistIds: string[]): Promise<void> {
+  return apiPut<void>(`/albums/${encodeURIComponent(id)}/artists`, { artist_ids: artistIds })
+}
+
 // disc/track 순 정렬. 아직 동기화 전인 앨범은 빈 배열.
 export function fetchAlbumTracks(albumId: string): Promise<Track[]> {
   return apiGet<Track[]>(`/albums/${encodeURIComponent(albumId)}/tracks`)

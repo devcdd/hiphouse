@@ -10,6 +10,7 @@ import { CommentSection } from '@/features/album-comments'
 import { ReportButton } from '@/features/report-album'
 import { EditDisplayNameButton } from '@/features/edit-display-name'
 import { EditAlbumInfoButton } from '@/features/edit-album-info'
+import { EditAlbumArtistsButton } from '@/features/edit-album-artists'
 import { AwardSection } from '@/features/awards'
 import { useResolvedTheme } from '@/features/theme'
 import { startKakaoLogin } from '@/features/auth'
@@ -179,7 +180,9 @@ export function AlbumDetailPage() {
 // 앨범과 함께 마운트/언마운트되므로 편집 상태가 다른 앨범으로 새지 않는다.
 function AdminCard({ album }: { album: Album }) {
   const qc = useQueryClient()
-  const [infoEditing, setInfoEditing] = useState(false)
+  // 폼 하나가 열려 있으면 나머지 도구는 숨긴다 — 폼이 한 줄 전체를 쓴다.
+  const [editing, setEditing] = useState<'info' | 'artists' | null>(null)
+  const editingChange = (form: 'info' | 'artists') => (open: boolean) => setEditing(open ? form : null)
 
   const toggleDelete = useMutation({
     mutationFn: (deleted: boolean) =>
@@ -199,11 +202,14 @@ function AdminCard({ album }: { album: Album }) {
         관리자 도구
       </div>
       <div className={styles.adminTools}>
-        {!infoEditing && (
+        {!editing && (
           <EditDisplayNameButton kind="album" id={album.id} name={album.name} displayName={album.display_name} />
         )}
-        <EditAlbumInfoButton album={album} onEditingChange={setInfoEditing} />
-        {!infoEditing && (
+        {editing !== 'artists' && <EditAlbumInfoButton album={album} onEditingChange={editingChange('info')} />}
+        {editing !== 'info' && (
+          <EditAlbumArtistsButton album={album} onEditingChange={editingChange('artists')} />
+        )}
+        {!editing && (
           <button
             type="button"
             className={album.deleted_at ? styles.restore : styles.delete}

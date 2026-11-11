@@ -3,6 +3,13 @@ export type { AlbumQuery, AlbumInfoPatch } from './api/albumApi'
 export { useAlbumFeed } from './api/useAlbumFeed'
 export { useAlbum } from './api/useAlbum'
 export { useAlbumTracks } from './api/useAlbumTracks'
-export { fetchAlbums, fetchYears, updateAlbumDisplayName, updateAlbumInfo, updateTrackDisplayName } from './api/albumApi'
+export {
+  fetchAlbums,
+  fetchYears,
+  updateAlbumArtists,
+  updateAlbumDisplayName,
+  updateAlbumInfo,
+  updateTrackDisplayName,
+} from './api/albumApi'
 export { AlbumCard } from './ui/AlbumCard'
 export { AlbumCardSkeleton } from './ui/AlbumCardSkeleton'

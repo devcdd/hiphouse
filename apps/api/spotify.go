@@ -358,6 +358,13 @@ func upsertAlbums(ctx context.Context, tx pgx.Tx, albums []spAlbum) (map[string]
 			strPtr(al.ExternalIDs.UPC), copyrightsJSON(al.Copyrights), strPtr(al.ReleaseDatePrecision)); err != nil {
 			return nil, err
 		}
+		var artistsEdited bool
+		if err := tx.QueryRow(ctx, "SELECT artists_edited_at IS NOT NULL FROM albums WHERE id=$1", al.ID).Scan(&artistsEdited); err != nil {
+			return nil, err
+		}
+		if artistsEdited {
+			continue
+		}
 		if _, err := tx.Exec(ctx, "DELETE FROM album_artists WHERE album_id=$1", al.ID); err != nil {
 			return nil, err
 		}
