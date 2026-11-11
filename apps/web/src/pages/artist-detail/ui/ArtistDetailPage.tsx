@@ -7,6 +7,7 @@ import { RefreshAlbumsButton } from '@/features/crawl-artist'
 import { EditDisplayNameButton } from '@/features/edit-display-name'
 import { WatchReleasesButton } from '@/features/watch-releases'
 import { AwardSection } from '@/features/awards'
+import { ArtistWall } from '@/features/artist-wall'
 import { Avatar } from '@/shared/ui/Avatar'
 import { displayName } from '@/shared/lib/displayName'
 import styles from './ArtistDetailPage.module.css'
@@ -50,6 +51,8 @@ export function ArtistDetailPage() {
       )}
 
       {artist && <AwardSection kind="artist" id={artist.id} />}
+      {/* 앨범 목록이 무한 스크롤이라 담벼락은 그 위에 둔다 */}
+      {artist && <ArtistWall artistId={artist.id} />}
 
       {error && <p className={styles.state}>불러오기 실패: {String(error)}</p>}
       <AlbumFeed params={{ artistId: id }} />
