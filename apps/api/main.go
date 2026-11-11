@@ -72,6 +72,7 @@ func main() {
 	mux.HandleFunc("POST /auth/logout", s.logout)
 	mux.HandleFunc("GET /me", s.requireAuth(s.me))
 	mux.HandleFunc("PUT /me", s.requireAuth(s.updateMe))
+	mux.HandleFunc("GET /me/wall", s.requireAuth(s.listMyWallPosts))
 	mux.HandleFunc("GET /me/artist-claim", s.requireAuth(s.getMyClaim))
 	mux.HandleFunc("PUT /me/artist-claim", s.requireAuth(s.putMyClaim))
 	mux.HandleFunc("DELETE /me/artist-claim", s.requireAuth(s.deleteMyClaim))
@@ -412,6 +413,7 @@ func (s *server) ensureAuthSchema(ctx context.Context) error {
 		CREATE INDEX IF NOT EXISTS idx_artist_wall_posts_artist ON artist_wall_posts(artist_id, id);
 		ALTER TABLE IF EXISTS artist_wall_posts ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 		CREATE INDEX IF NOT EXISTS idx_artist_wall_posts_quota ON artist_wall_posts(artist_id, user_id, created_at);
+		CREATE INDEX IF NOT EXISTS idx_artist_wall_posts_user ON artist_wall_posts(user_id, id);
 		-- "아티스트 본인입니다" 신청. 사용자당 한 건이고 approved일 때만 담벼락에 인증 표시가 붙는다.
 		-- 한 아티스트에 여러 사용자가 붙을 수 있다 (크루 멤버 등, 관리자가 판단).
 		CREATE TABLE IF NOT EXISTS artist_claims (
