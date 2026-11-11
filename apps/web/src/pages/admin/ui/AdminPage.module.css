@@ -425,6 +425,21 @@
   background: var(--surface);
 }
 
+.rowAvatarLink {
+  flex: none;
+  display: flex;
+  border-radius: 999px;
+}
+
+.rowNameLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.rowNameLink:hover {
+  text-decoration: underline;
+}
+
 .rowInfo {
   flex: none;
   width: 180px;
