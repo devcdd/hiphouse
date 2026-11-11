@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { GitMerge, Search, Trash2, X } from 'lucide-react'
 import {
@@ -161,6 +162,7 @@ function AliasRow({
   const [name, setName] = useState(savedName) // 한글 표시 이름 (비우면 해제)
   const [confirming, setConfirming] = useState(false)
   const shown = displayName(artist)
+  const artistHref = `/artists/${encodeURIComponent(artist.id)}`
   const dirty = text !== saved || name.trim() !== savedName
 
   // 한 번의 저장으로 한글명 + 연관검색어를 함께 반영 — 바뀐 것만 요청한다.
@@ -218,11 +220,14 @@ function AliasRow({
         onChange={onToggle}
         aria-label={`${shown} 선택`}
       />
-      <Avatar src={artist.image_url} name={shown} size={40} />
+      {/* 이름 링크와 목적지가 같아서 아바타 링크는 탭 순서에서 뺀다 */}
+      <Link to={artistHref} className={styles.rowAvatarLink} tabIndex={-1} aria-hidden>
+        <Avatar src={artist.image_url} name={shown} size={40} />
+      </Link>
       <div className={styles.rowInfo}>
-        <span className={styles.rowName} title={shown}>
+        <Link to={artistHref} className={`${styles.rowName} ${styles.rowNameLink}`} title={`${shown} 상세 보기`}>
           {shown}
-        </span>
+        </Link>
         <span className={styles.rowId}>{artist.id}</span>
       </div>
       <label className={styles.checkLabel} title="신보 체크 탭이 확인하는 대상인지 여부">
