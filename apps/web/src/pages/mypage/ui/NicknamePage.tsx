@@ -4,6 +4,7 @@ import { ChevronLeft } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth, updateNickname } from '@/entities/session'
 import { useToast } from '@/shared/ui/toast'
+import { ArtistClaimSection } from '@/features/artist-claim'
 import { AuthGate } from './AuthGate'
 import styles from './MyPage.module.css'
 
@@ -73,6 +74,7 @@ function Editor() {
           </button>
         </div>
       </section>
+      <ArtistClaimSection />
     </div>
   )
 }

@@ -72,6 +72,9 @@ func main() {
 	mux.HandleFunc("POST /auth/logout", s.logout)
 	mux.HandleFunc("GET /me", s.requireAuth(s.me))
 	mux.HandleFunc("PUT /me", s.requireAuth(s.updateMe))
+	mux.HandleFunc("GET /me/artist-claim", s.requireAuth(s.getMyClaim))
+	mux.HandleFunc("PUT /me/artist-claim", s.requireAuth(s.putMyClaim))
+	mux.HandleFunc("DELETE /me/artist-claim", s.requireAuth(s.deleteMyClaim))
 
 	// 공개 프로필 — 닉네임/평가 통계와 평가한 앨범. 로그인 없이 열람 가능.
 	mux.HandleFunc("GET /users/{id}", s.getPublicUser)
@@ -140,12 +143,16 @@ func main() {
 	mux.HandleFunc("DELETE /awards/{id}", s.requireAdmin(s.deleteAward))
 	mux.HandleFunc("GET /artists/{id}/wall", s.listWallPosts)
 	mux.HandleFunc("POST /artists/{id}/wall", s.requireAuth(s.addWallPost))
+	mux.HandleFunc("GET /artists/{id}/wall/quota", s.requireAuth(s.getWallQuota))
+	mux.HandleFunc("GET /artists/{id}/wall/count", s.countWallPosts)
 	mux.HandleFunc("DELETE /wall/{id}", s.requireAuth(s.deleteWallPost))
 	mux.HandleFunc("POST /artists/merge", s.requireAdmin(s.mergeArtists))
 	mux.HandleFunc("DELETE /artists/{id}", s.requireAdmin(s.deleteArtist))
 
 	mux.HandleFunc("GET /admin/stats", s.requireAdmin(s.adminStats))
 	mux.HandleFunc("GET /admin/users", s.requireAdmin(s.adminListUsers))
+	mux.HandleFunc("GET /admin/artist-claims", s.requireAdmin(s.adminListClaims))
+	mux.HandleFunc("PUT /admin/artist-claims/{userId}", s.requireAdmin(s.adminReviewClaim))
 	mux.HandleFunc("GET /admin/not-hiphop", s.requireAdmin(s.adminListFlagged(tblNotHiphop)))
 	mux.HandleFunc("DELETE /admin/not-hiphop/{id}", s.requireAdmin(s.adminClearFlags(tblNotHiphop)))
 	mux.HandleFunc("GET /admin/rename-requests", s.requireAdmin(s.adminListFlagged(tblRename)))
@@ -403,6 +410,19 @@ func (s *server) ensureAuthSchema(ctx context.Context) error {
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		);
 		CREATE INDEX IF NOT EXISTS idx_artist_wall_posts_artist ON artist_wall_posts(artist_id, id);
+		ALTER TABLE IF EXISTS artist_wall_posts ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+		CREATE INDEX IF NOT EXISTS idx_artist_wall_posts_quota ON artist_wall_posts(artist_id, user_id, created_at);
+		-- "아티스트 본인입니다" 신청. 사용자당 한 건이고 approved일 때만 담벼락에 인증 표시가 붙는다.
+		-- 한 아티스트에 여러 사용자가 붙을 수 있다 (크루 멤버 등, 관리자가 판단).
+		CREATE TABLE IF NOT EXISTS artist_claims (
+			user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+			artist_id TEXT NOT NULL REFERENCES artists(id) ON DELETE CASCADE,
+			status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+			note TEXT NOT NULL DEFAULT '',
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			reviewed_at TIMESTAMPTZ
+		);
+		CREATE INDEX IF NOT EXISTS idx_artist_claims_status ON artist_claims(status, created_at);
 
 		-- Denormalized aggregates on albums. The list query sorts by these, so as
 		-- correlated subqueries they were computed for every matching row before

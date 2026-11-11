@@ -4,20 +4,61 @@
   gap: 10px;
 }
 
-.title {
+.toggle {
   display: flex;
   align-items: center;
   gap: 7px;
-  margin: 0;
-  font-size: 1.1rem;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--fg);
+  cursor: pointer;
+  text-align: left;
+}
+
+.title {
+  font-size: 1.05rem;
   font-weight: 700;
 }
 
+/* 우측 끝에 작게: 글 수 + 펼침 화살표 */
+.end {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.count {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.chevron {
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .feed {
-  height: 280px;
+  display: flex;
+  flex-direction: column;
+  height: 360px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 10px 12px;
+  padding: 12px;
   border-radius: 14px;
   background: var(--surface);
 }
@@ -25,61 +66,127 @@
 .list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 10px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.line {
+.msg {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   gap: 8px;
-  padding: 3px 6px;
-  border-radius: 8px;
-  font-size: 0.88rem;
-  line-height: 1.45;
+  max-width: 85%;
 }
 
-.line:hover {
-  background: color-mix(in srgb, var(--fg) 5%, transparent);
+.continued {
+  margin-top: -6px;
+}
+
+.left {
+  align-self: flex-start;
+}
+
+.right {
+  align-self: flex-end;
+}
+
+.avatar {
+  flex: none;
+  width: 32px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.right .stack {
+  align-items: flex-end;
 }
 
 .nick {
-  flex: none;
-  max-width: 9em;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 14em;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: var(--muted);
+  font-size: 0.74rem;
   font-weight: 700;
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .nick:hover {
-  color: var(--fg);
+  text-decoration: underline;
 }
 
-.mine .nick {
-  color: var(--fg);
+.verified {
+  color: var(--verified);
 }
 
-.body {
-  flex: 1;
+.bubbleRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
   min-width: 0;
+}
+
+/* 오른쪽 말풍선은 시간이 말풍선 왼쪽에 온다 */
+.right .bubbleRow {
+  flex-direction: row-reverse;
+}
+
+.bubble {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 16px;
+  background: var(--bg);
+  font-size: 0.88rem;
+  line-height: 1.45;
   overflow-wrap: anywhere;
 }
 
-.time {
+.left .bubble {
+  border-top-left-radius: 4px;
+}
+
+.right .bubble {
+  border-top-right-radius: 4px;
+}
+
+.continued .bubble {
+  border-radius: 16px;
+}
+
+.ownerBubble {
+  background: color-mix(in srgb, var(--verified) 16%, var(--bg));
+}
+
+.mineBubble {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.side {
   flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.time {
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: 0.66rem;
+  white-space: nowrap;
 }
 
 .remove {
-  flex: none;
   display: inline-flex;
-  align-self: center;
   padding: 3px;
   border: none;
   border-radius: 6px;
@@ -89,7 +196,7 @@
   opacity: 0;
 }
 
-.line:hover .remove,
+.msg:hover .remove,
 .remove:focus-visible {
   opacity: 1;
 }
@@ -106,8 +213,8 @@
 }
 
 .more {
-  display: block;
-  margin: 0 auto 8px;
+  align-self: center;
+  margin-bottom: 10px;
   padding: 5px 12px;
   border: none;
   border-radius: 999px;
@@ -118,9 +225,10 @@
   cursor: pointer;
 }
 
+/* 피드가 flex column이라 margin:auto로 세로·가로 가운데에 둔다 */
 .state {
-  margin: 0;
-  padding: 24px 0;
+  margin: auto;
+  padding: 0 16px;
   text-align: center;
   color: var(--muted);
   font-size: 0.85rem;
@@ -155,6 +263,10 @@
   outline: none;
 }
 
+.input:disabled {
+  cursor: not-allowed;
+}
+
 .counter {
   flex: none;
   color: var(--muted);
@@ -175,6 +287,13 @@
 .send:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+.quota {
+  margin: 0;
+  padding: 0 14px;
+  color: var(--muted);
+  font-size: 0.74rem;
 }
 
 .login {

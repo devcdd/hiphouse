@@ -805,3 +805,95 @@
   cursor: default;
 }
 
+
+/* 아티스트 인증 탭 */
+.claimFilters {
+  display: flex;
+  gap: 6px;
+}
+
+.claimFilter {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.claimFilterActive {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.claimRow {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.claimMain {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.claimUser {
+  color: var(--fg);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.claimArrow {
+  color: var(--muted);
+}
+
+.claimArtist {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--verified);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.claimUser:hover,
+.claimArtist:hover {
+  text-decoration: underline;
+}
+
+.claimNote {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.claimActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.claimGhost {
+  padding: 7px 14px;
+  border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.claimGhost:hover {
+  color: var(--fg);
+}

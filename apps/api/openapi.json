@@ -286,7 +286,7 @@
       "post": {
         "tags": ["artists"],
         "summary": "아티스트 담벼락에 메시지 남기기 (로그인 필요)",
-        "description": "앞뒤 공백을 뺀 50자 이하. 같은 사용자가 같은 담벼락에 3초 안에 다시 쓰면 429.",
+        "description": "앞뒤 공백을 뺀 50자 이하. 사용자 한 명이 담벼락 하나에 하루(KST) 3개까지 쓸 수 있고 지운 글도 센다. 넘으면 429. 담벼락 주인 아티스트로 인증된 본인은 제한이 없다.",
         "requestBody": {
           "required": true,
           "content": { "application/json": { "schema": { "type": "object", "required": ["body"], "properties": { "body": { "type": "string", "maxLength": 50 } } } } }
@@ -295,7 +295,68 @@
           "201": { "description": "등록됨", "content": { "application/json": { "schema": { "type": "object", "properties": { "id": { "type": "integer" }, "user_id": { "type": "string" }, "nickname": { "type": "string" }, "body": { "type": "string", "example": "신보 언제 나와요" }, "created_at": { "type": "string", "format": "date-time" } } } } } },
           "400": { "$ref": "#/components/responses/BadRequest" },
           "404": { "$ref": "#/components/responses/NotFound" },
-          "429": { "description": "너무 빠르게 연속 작성" }
+          "429": { "description": "오늘 작성 한도 초과" }
+        }
+      }
+    },
+    "/artists/{id}/wall/count": {
+      "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+      "get": {
+        "tags": ["artists"],
+        "summary": "담벼락 글 수 (지운 글 제외)",
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "count": { "type": "integer" } } } } } } }
+      }
+    },
+    "/artists/{id}/wall/quota": {
+      "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+      "get": {
+        "tags": ["artists"],
+        "summary": "오늘 이 담벼락에 쓴 횟수 (로그인 필요)",
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "limit": { "type": "integer", "example": 3 }, "used": { "type": "integer" }, "unlimited": { "type": "boolean", "description": "담벼락 주인 아티스트로 인증된 본인" } } } } } } }
+      }
+    },
+    "/me/artist-claim": {
+      "get": {
+        "tags": ["users"],
+        "summary": "내 아티스트 본인 인증 신청 (없으면 null)",
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "user_id": { "type": "string" }, "nickname": { "type": "string" }, "artist_id": { "type": "string" }, "artist_name": { "type": "string", "nullable": true }, "artist_display_name": { "type": "string", "nullable": true }, "artist_image_url": { "type": "string", "nullable": true }, "status": { "type": "string", "enum": ["pending", "approved", "rejected"] }, "note": { "type": "string" }, "created_at": { "type": "string", "format": "date-time" }, "reviewed_at": { "type": "string", "format": "date-time", "nullable": true } } } } } } }
+      },
+      "put": {
+        "tags": ["users"],
+        "summary": "아티스트 본인 인증 신청·수정",
+        "description": "아티스트나 메모가 바뀌거나 반려된 상태면 다시 검수 대기(pending)로 돌아간다.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["artist_id"], "properties": { "artist_id": { "type": "string" }, "note": { "type": "string", "maxLength": 200 } } } } } },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "user_id": { "type": "string" }, "nickname": { "type": "string" }, "artist_id": { "type": "string" }, "artist_name": { "type": "string", "nullable": true }, "artist_display_name": { "type": "string", "nullable": true }, "artist_image_url": { "type": "string", "nullable": true }, "status": { "type": "string", "enum": ["pending", "approved", "rejected"] }, "note": { "type": "string" }, "created_at": { "type": "string", "format": "date-time" }, "reviewed_at": { "type": "string", "format": "date-time", "nullable": true } } } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["users"],
+        "summary": "아티스트 본인 인증 철회",
+        "responses": { "204": { "description": "철회됨" } }
+      }
+    },
+    "/admin/artist-claims": {
+      "get": {
+        "tags": ["admin"],
+        "summary": "아티스트 본인 인증 신청 목록 (관리자)",
+        "parameters": [{ "name": "status", "in": "query", "schema": { "type": "string", "enum": ["pending", "approved", "rejected"], "default": "pending" } }],
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "type": "object", "properties": { "user_id": { "type": "string" }, "nickname": { "type": "string" }, "artist_id": { "type": "string" }, "artist_name": { "type": "string", "nullable": true }, "artist_display_name": { "type": "string", "nullable": true }, "artist_image_url": { "type": "string", "nullable": true }, "status": { "type": "string", "enum": ["pending", "approved", "rejected"] }, "note": { "type": "string" }, "created_at": { "type": "string", "format": "date-time" }, "reviewed_at": { "type": "string", "format": "date-time", "nullable": true } } } } } } } }
+      }
+    },
+    "/admin/artist-claims/{userId}": {
+      "parameters": [{ "name": "userId", "in": "path", "required": true, "schema": { "type": "string" } }],
+      "put": {
+        "tags": ["admin"],
+        "summary": "아티스트 본인 인증 승인·반려 (관리자)",
+        "description": "artist_id를 주면 신청자가 고른 아티스트 대신 그 아티스트로 매핑한다.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["status"], "properties": { "status": { "type": "string", "enum": ["approved", "rejected"] }, "artist_id": { "type": "string", "nullable": true } } } } } },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "user_id": { "type": "string" }, "nickname": { "type": "string" }, "artist_id": { "type": "string" }, "artist_name": { "type": "string", "nullable": true }, "artist_display_name": { "type": "string", "nullable": true }, "artist_image_url": { "type": "string", "nullable": true }, "status": { "type": "string", "enum": ["pending", "approved", "rejected"] }, "note": { "type": "string" }, "created_at": { "type": "string", "format": "date-time" }, "reviewed_at": { "type": "string", "format": "date-time", "nullable": true } } } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
     },
@@ -304,6 +365,7 @@
       "delete": {
         "tags": ["artists"],
         "summary": "담벼락 메시지 삭제 (작성자 또는 관리자)",
+        "description": "소프트 삭제라서 하루 작성 횟수에는 남는다.",
         "responses": {
           "204": { "description": "삭제됨" },
           "404": { "$ref": "#/components/responses/NotFound" }
