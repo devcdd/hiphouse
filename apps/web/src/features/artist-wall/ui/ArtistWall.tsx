@@ -1,10 +1,17 @@
-import { useLayoutEffect, useRef, useState, type FormEvent } from 'react'
+import { useId, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { MessagesSquare, SendHorizontal, Trash2 } from 'lucide-react'
+import { BadgeCheck, ChevronDown, MessagesSquare, SendHorizontal, Trash2 } from 'lucide-react'
 import { useAuth } from '@/entities/session'
 import { startKakaoLogin } from '@/features/auth'
-import { WALL_MAX_LEN } from '@/features/artist-wall/api/wallApi'
-import { useAddWallPost, useRemoveWallPost, useWall } from '@/features/artist-wall/model/useWall'
+import { Avatar } from '@/shared/ui/Avatar'
+import { WALL_MAX_LEN, type WallPost } from '@/features/artist-wall/api/wallApi'
+import {
+  useAddWallPost,
+  useRemoveWallPost,
+  useWall,
+  useWallCount,
+  useWallQuota,
+} from '@/features/artist-wall/model/useWall'
 import styles from './ArtistWall.module.css'
 
 const timeFmt = new Intl.DateTimeFormat('ko-KR', { hour: '2-digit', minute: '2-digit' })
@@ -17,9 +24,53 @@ function stamp(iso: string) {
   return today ? timeFmt.format(d) : `${dateFmt.format(d)} ${timeFmt.format(d)}`
 }
 
-// 아티스트 담벼락. 채팅창처럼 아래가 최신이고, 위로 올리면 과거 메시지를 더 불러온다.
-export function ArtistWall({ artistId }: { artistId: string }) {
+type WallArtist = { id: string; name: string; image_url: string | null }
+
+// 아티스트 담벼락. 기본은 접혀 있고 헤더에는 글 수만 보인다. 펼쳐야 글을 불러온다.
+export function ArtistWall({ artist }: { artist: WallArtist }) {
+  const [open, setOpen] = useState(false)
+  const count = useWallCount(artist.id).data?.count
+  const panelId = useId()
+
+  return (
+    <section className={styles.wall} aria-label="담벼락">
+      <button
+        type="button"
+        className={styles.toggle}
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <MessagesSquare size={17} strokeWidth={2.2} aria-hidden />
+        <span className={styles.title}>담벼락</span>
+        <span className={styles.end}>
+          {count != null && <span className={styles.count}>{count.toLocaleString()}개</span>}
+          <ChevronDown
+            size={16}
+            strokeWidth={2.4}
+            className={open ? `${styles.chevron} ${styles.chevronOpen}` : styles.chevron}
+            aria-hidden
+          />
+        </span>
+      </button>
+      {/* 펼칠 때마다 새로 마운트해서 스크롤이 항상 최신 글(맨 아래)에서 시작한다 */}
+      {open && (
+        <div id={panelId} className={styles.panel}>
+          <WallBody artist={artist} />
+        </div>
+      )}
+    </section>
+  )
+}
+
+// 채팅창처럼 아래가 최신이고, 위로 올리면 과거 메시지를 더 불러온다.
+// 담벼락 주인 아티스트로 인증된 사람의 글은 왼쪽, 나머지 사람의 글은 오른쪽 말풍선이다.
+function WallBody({ artist }: { artist: WallArtist }) {
+  const artistId = artist.id
   const { user, isAuthed, isAdmin } = useAuth()
+  const quota = useWallQuota(artistId, isAuthed).data
+  const remaining = quota && !quota.unlimited ? Math.max(quota.limit - quota.used, 0) : null
+  const blocked = remaining === 0
   const { posts, isLoading, error, hasNextPage, fetchNextPage, isFetchingNextPage } = useWall(artistId)
   const add = useAddWallPost(artistId)
   const remove = useRemoveWallPost(artistId)
@@ -56,18 +107,13 @@ export function ArtistWall({ artistId }: { artistId: string }) {
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (!text || add.isPending) return
+    if (!text || add.isPending || blocked) return
     prev.current.nearBottom = true // 내가 쓴 글은 항상 보이게
     add.mutate(text, { onSuccess: () => setBody('') })
   }
 
   return (
-    <section className={styles.wall} aria-label="담벼락">
-      <h2 className={styles.title}>
-        <MessagesSquare size={17} strokeWidth={2.2} aria-hidden />
-        담벼락
-      </h2>
-
+    <>
       <div
         ref={scroller}
         className={styles.feed}
@@ -95,33 +141,24 @@ export function ArtistWall({ artistId }: { artistId: string }) {
         {!isLoading && !error && posts.length === 0 && (
           <p className={styles.state}>아직 아무도 글을 남기지 않았어요. 첫 메시지를 남겨 보세요.</p>
         )}
-        <ul className={styles.list}>
-          {posts.map((p) => {
-            const mine = p.user_id === user?.id
-            return (
-              <li key={p.id} className={mine ? `${styles.line} ${styles.mine}` : styles.line}>
-                <Link to={`/users/${encodeURIComponent(p.user_id)}`} className={styles.nick}>
-                  {p.nickname || '익명'}
-                </Link>
-                <span className={styles.body}>{p.body}</span>
-                <time className={styles.time} dateTime={p.created_at}>
-                  {stamp(p.created_at)}
-                </time>
-                {(mine || isAdmin) && (
-                  <button
-                    type="button"
-                    className={styles.remove}
-                    disabled={remove.isPending}
-                    aria-label="메시지 삭제"
-                    onClick={() => remove.mutate(p.id)}
-                  >
-                    <Trash2 size={12} strokeWidth={2.2} />
-                  </button>
-                )}
-              </li>
-            )
-          })}
-        </ul>
+        {posts.length > 0 && (
+          <ul className={styles.list}>
+            {posts.map((p, i) => (
+              <Bubble
+                key={p.id}
+                post={p}
+                owner={p.artist_id === artistId}
+                ownerImage={artist.image_url}
+                // 같은 사람이 이어 쓰면 이름은 첫 말풍선에만 단다.
+                continued={i > 0 && posts[i - 1].user_id === p.user_id}
+                mine={p.user_id === user?.id}
+                canDelete={p.user_id === user?.id || isAdmin}
+                deleting={remove.isPending}
+                onDelete={() => remove.mutate(p.id)}
+              />
+            ))}
+          </ul>
+        )}
       </div>
 
       {isAuthed ? (
@@ -131,21 +168,94 @@ export function ArtistWall({ artistId }: { artistId: string }) {
             value={body}
             maxLength={WALL_MAX_LEN}
             onChange={(e) => setBody(e.target.value)}
-            placeholder="한마디 남기기"
+            placeholder={blocked ? '오늘은 더 남길 수 없어요. 내일 다시 만나요' : '한마디 남기기'}
+            disabled={blocked}
             aria-label="담벼락 메시지"
           />
           <span className={styles.counter}>
             {body.length}/{WALL_MAX_LEN}
           </span>
-          <button type="submit" className={styles.send} disabled={!text || add.isPending} aria-label="보내기">
+          <button type="submit" className={styles.send} disabled={!text || add.isPending || blocked} aria-label="보내기">
             <SendHorizontal size={16} strokeWidth={2.2} />
           </button>
         </form>
-      ) : (
+      ) : null}
+      {isAuthed && remaining !== null && (
+        <p className={styles.quota}>
+          오늘 이 담벼락에 {remaining}번 더 남길 수 있어요 (하루 {quota!.limit}번)
+        </p>
+      )}
+      {!isAuthed && (
         <button type="button" className={styles.login} onClick={startKakaoLogin}>
           로그인하고 담벼락에 글 남기기
         </button>
       )}
-    </section>
+    </>
+  )
+}
+
+function Bubble({
+  post,
+  owner,
+  ownerImage,
+  continued,
+  mine,
+  canDelete,
+  deleting,
+  onDelete,
+}: {
+  post: WallPost
+  owner: boolean
+  ownerImage: string | null
+  continued: boolean
+  mine: boolean
+  canDelete: boolean
+  deleting: boolean
+  onDelete: () => void
+}) {
+  const verified = post.artist_id != null
+  const name = verified ? post.artist_name || post.nickname : post.nickname || '익명'
+  const nameHref = verified
+    ? `/artists/${encodeURIComponent(post.artist_id!)}`
+    : `/users/${encodeURIComponent(post.user_id)}`
+  const cls = [styles.msg, owner ? styles.left : styles.right, continued && styles.continued]
+    .filter(Boolean)
+    .join(' ')
+
+  return (
+    <li className={cls}>
+      {owner && (
+        <span className={styles.avatar} aria-hidden>
+          {!continued && <Avatar src={ownerImage} name={name} size={32} />}
+        </span>
+      )}
+      <div className={styles.stack}>
+        {!continued && (
+          <Link
+            to={nameHref}
+            className={verified ? `${styles.nick} ${styles.verified}` : styles.nick}
+            title={verified ? `인증된 아티스트 (${post.nickname})` : undefined}
+          >
+            {name}
+            {verified && <BadgeCheck size={13} strokeWidth={2.4} aria-label="인증된 아티스트" />}
+          </Link>
+        )}
+        <div className={styles.bubbleRow}>
+          <p className={[styles.bubble, owner && styles.ownerBubble, mine && !owner && styles.mineBubble].filter(Boolean).join(' ')}>
+            {post.body}
+          </p>
+          <div className={styles.side}>
+            {canDelete && (
+              <button type="button" className={styles.remove} disabled={deleting} aria-label="메시지 삭제" onClick={onDelete}>
+                <Trash2 size={12} strokeWidth={2.2} />
+              </button>
+            )}
+            <time className={styles.time} dateTime={post.created_at}>
+              {stamp(post.created_at)}
+            </time>
+          </div>
+        </div>
+      </div>
+    </li>
   )
 }

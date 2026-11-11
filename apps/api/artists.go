@@ -423,6 +423,10 @@ func (s *server) mergeArtists(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
+	if _, err := tx.Exec(r.Context(), "UPDATE artist_claims SET artist_id=$1 WHERE artist_id = ANY($2)", body.MasterID, merged); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
 
 	// Move credits one duplicate at a time: the guard skips albums where the
 	// master is already credited, and the leftover duplicate rows are dropped.

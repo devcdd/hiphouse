@@ -11,12 +11,13 @@ import { StatsTab } from './StatsTab'
 import { ReportsTab } from './ReportsTab'
 import { RenameRequestsTab } from './RenameRequestsTab'
 import { UsersTab } from './UsersTab'
+import { ArtistClaimsTab } from './ArtistClaimsTab'
 import 'swiper/css'
 import 'swiper/css/free-mode'
 import 'swiper/css/mousewheel'
 import styles from './AdminPage.module.css'
 
-type Tab = 'deleted' | 'aliases' | 'crawl' | 'tracks' | 'releases' | 'stats' | 'reports' | 'rename' | 'users'
+type Tab = 'deleted' | 'aliases' | 'crawl' | 'tracks' | 'releases' | 'stats' | 'reports' | 'rename' | 'users' | 'claims'
 const TABS: { key: Tab; label: string }[] = [
   { key: 'crawl', label: '크롤링' },
   { key: 'releases', label: '신보 체크' },
@@ -26,6 +27,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'reports', label: '힙합 아님 신고' },
   { key: 'rename', label: '이름 변경 요청' },
   { key: 'users', label: '회원' },
+  { key: 'claims', label: '아티스트 인증' },
   { key: 'stats', label: '통계' },
 ]
 
@@ -89,6 +91,8 @@ export function AdminPage() {
         <RenameRequestsTab />
       ) : tab === 'users' ? (
         <UsersTab />
+      ) : tab === 'claims' ? (
+        <ArtistClaimsTab />
       ) : (
         <AliasManagerTab />
       )}

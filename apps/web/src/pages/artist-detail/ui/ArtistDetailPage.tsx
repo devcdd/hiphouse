@@ -52,7 +52,7 @@ export function ArtistDetailPage() {
 
       {artist && <AwardSection kind="artist" id={artist.id} />}
       {/* 앨범 목록이 무한 스크롤이라 담벼락은 그 위에 둔다 */}
-      {artist && <ArtistWall artistId={artist.id} />}
+      {artist && <ArtistWall artist={{ id: artist.id, name, image_url: artist.image_url }} />}
 
       {error && <p className={styles.state}>불러오기 실패: {String(error)}</p>}
       <AlbumFeed params={{ artistId: id }} />

@@ -1,8 +1,10 @@
 import { useMemo } from 'react'
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   addWallPost,
+  fetchWallCount,
   fetchWallPosts,
+  fetchWallQuota,
   removeWallPost,
   WALL_PAGE_SIZE,
   type WallPost,
@@ -37,14 +39,29 @@ export function useWall(artistId: string) {
   return { ...query, posts }
 }
 
+// 접힌 헤더에 띄우는 글 수. 'wall' 키 아래라서 글을 쓰거나 지울 때 목록과 함께 무효화된다.
+export function useWallCount(artistId: string) {
+  return useQuery({ queryKey: ['wall', artistId, 'count'], queryFn: () => fetchWallCount(artistId) })
+}
+
+export function useWallQuota(artistId: string, enabled: boolean) {
+  return useQuery({ queryKey: ['wall-quota', artistId], queryFn: () => fetchWallQuota(artistId), enabled })
+}
+
 export function useAddWallPost(artistId: string) {
   const qc = useQueryClient()
   const toast = useToast()
   return useMutation({
     mutationFn: (body: string) => addWallPost(artistId, body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['wall', artistId] }),
-    onError: (e) =>
-      toast(e.message.includes('too fast') ? '조금 천천히 남겨 주세요' : '메시지 등록에 실패했습니다', 'error'),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['wall', artistId] })
+      qc.invalidateQueries({ queryKey: ['wall-quota', artistId] })
+    },
+    onError: (e) => {
+      const limited = e.message.includes('limit reached')
+      if (limited) qc.invalidateQueries({ queryKey: ['wall-quota', artistId] })
+      toast(limited ? '오늘은 이 담벼락에 더 남길 수 없어요' : '메시지 등록에 실패했습니다', 'error')
+    },
   })
 }
 

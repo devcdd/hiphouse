@@ -7,6 +7,8 @@
   /* 수상 태그: 별점 노랑(#f5b301) 계열, 글자는 라이트에서 대비 확보한 어두운 골드 */
   --award: #8a6a0a;
   --award-bg: rgba(245, 179, 1, 0.16);
+  /* 인증된 아티스트 본인 이름: 금색 수상 태그와 겹치지 않는 보라 */
+  --verified: #6d28d9;
 }
 
 /* dark tokens: applied by system default (no explicit choice) or by manual toggle */
@@ -18,6 +20,7 @@
     --surface: #1c1c1c;
     --award: #f0c94a;
     --award-bg: rgba(245, 179, 1, 0.14);
+    --verified: #b794f6;
   }
 }
 
@@ -28,6 +31,7 @@
   --surface: #1c1c1c;
   --award: #f0c94a;
   --award-bg: rgba(245, 179, 1, 0.14);
+  --verified: #b794f6;
 }
 
 * {
