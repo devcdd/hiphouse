@@ -1,9 +1,10 @@
-import { useId, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useId, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { BadgeCheck, ChevronDown, MessagesSquare, SendHorizontal, Trash2 } from 'lucide-react'
 import { useAuth } from '@/entities/session'
 import { startKakaoLogin } from '@/features/auth'
 import { Avatar } from '@/shared/ui/Avatar'
+import { useInfiniteScroll } from '@/shared/lib/useInfiniteScroll'
 import { WALL_MAX_LEN, type WallPost } from '@/features/artist-wall/api/wallApi'
 import {
   useAddWallPost,
@@ -102,8 +103,19 @@ function WallBody({ artist }: { artist: WallArtist }) {
     prev.current.height = el.scrollHeight
     prev.current.top = el.scrollTop
     prev.current.nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_PX
-    if (el.scrollTop === 0 && hasNextPage && !isFetchingNextPage) fetchNextPage()
   }
+
+  // 위쪽 sentinel이 보이면 과거 페이지를 붙인다. 첫 렌더는 맨 아래로 스크롤된 뒤라 바로 불리지 않는다.
+  const loadOlder = useCallback(() => {
+    const el = scroller.current
+    if (el) Object.assign(prev.current, { height: el.scrollHeight, top: el.scrollTop })
+    fetchNextPage()
+  }, [fetchNextPage])
+  const sentinel = useInfiniteScroll<HTMLDivElement>(
+    loadOlder,
+    !!hasNextPage && !isFetchingNextPage && posts.length > 0,
+    { root: scroller, rootMargin: '120px 0px 0px 0px' },
+  )
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -122,20 +134,8 @@ function WallBody({ artist }: { artist: WallArtist }) {
         aria-live="polite"
         aria-busy={isLoading || isFetchingNextPage}
       >
-        {hasNextPage && (
-          <button
-            type="button"
-            className={styles.more}
-            disabled={isFetchingNextPage}
-            onClick={() => {
-              const el = scroller.current
-              if (el) Object.assign(prev.current, { height: el.scrollHeight, top: el.scrollTop })
-              fetchNextPage()
-            }}
-          >
-            {isFetchingNextPage ? '불러오는 중…' : '이전 메시지'}
-          </button>
-        )}
+        {hasNextPage && <div ref={sentinel} className={styles.sentinel} aria-hidden />}
+        {isFetchingNextPage && <p className={styles.loadingOlder}>이전 글 불러오는 중…</p>}
         {isLoading && <p className={styles.state}>불러오는 중…</p>}
         {error && <p className={styles.state}>불러오기 실패</p>}
         {!isLoading && !error && posts.length === 0 && (
@@ -182,7 +182,9 @@ function WallBody({ artist }: { artist: WallArtist }) {
       ) : null}
       {isAuthed && remaining !== null && (
         <p className={styles.quota}>
-          오늘 이 담벼락에 {remaining}번 더 남길 수 있어요 (하루 {quota!.limit}번)
+          {blocked
+            ? `오늘 남길 수 있는 글을 다 썼어요 (하루 ${quota!.limit}번)`
+            : `오늘 이 담벼락에 ${remaining}번 더 남길 수 있어요 (하루 ${quota!.limit}번)`}
         </p>
       )}
       {!isAuthed && (
@@ -245,14 +247,14 @@ function Bubble({
             {post.body}
           </p>
           <div className={styles.side}>
+            <time className={styles.time} dateTime={post.created_at}>
+              {stamp(post.created_at)}
+            </time>
             {canDelete && (
               <button type="button" className={styles.remove} disabled={deleting} aria-label="메시지 삭제" onClick={onDelete}>
                 <Trash2 size={12} strokeWidth={2.2} />
               </button>
             )}
-            <time className={styles.time} dateTime={post.created_at}>
-              {stamp(post.created_at)}
-            </time>
           </div>
         </div>
       </div>

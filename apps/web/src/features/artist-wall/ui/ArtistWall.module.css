@@ -96,6 +96,11 @@
   width: 32px;
 }
 
+/* 피드 배경이 --surface라 기본 아바타 배경과 겹친다 */
+.avatar > div {
+  background: var(--bg);
+}
+
 .stack {
   display: flex;
   flex-direction: column;
@@ -171,12 +176,16 @@
   color: var(--bg);
 }
 
+/* 시간이 말풍선 바로 옆, 삭제는 그 바깥. 오른쪽 말풍선은 순서를 뒤집는다 */
 .side {
   flex: none;
   display: flex;
-  flex-direction: column;
   align-items: center;
   gap: 2px;
+}
+
+.right .side {
+  flex-direction: row-reverse;
 }
 
 .time {
@@ -212,17 +221,16 @@
   color: #e5484d;
 }
 
-.more {
-  align-self: center;
-  margin-bottom: 10px;
-  padding: 5px 12px;
-  border: none;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--fg) 8%, transparent);
+.sentinel {
+  flex: none;
+  height: 1px;
+}
+
+.loadingOlder {
+  margin: 0 0 10px;
+  text-align: center;
   color: var(--muted);
   font-size: 0.75rem;
-  font-weight: 700;
-  cursor: pointer;
 }
 
 /* 피드가 flex column이라 margin:auto로 세로·가로 가운데에 둔다 */
