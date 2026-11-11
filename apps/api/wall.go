@@ -206,3 +206,44 @@ func (s *server) deleteWallPost(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(204)
 }
+
+const myWallPageSize = 30
+
+// MyWallPost는 내 글 모아보기 한 줄이다. 어느 아티스트 담벼락에 쓴 글인지 함께 준다.
+type MyWallPost struct {
+	ID          int64   `json:"id" db:"id"`
+	Body        string  `json:"body" db:"body"`
+	CreatedAt   string  `json:"created_at" db:"created_at"`
+	ArtistID    string  `json:"artist_id" db:"artist_id"`
+	ArtistName  *string `json:"artist_name" db:"artist_name"`
+	ArtistImage *string `json:"artist_image_url" db:"artist_image_url"`
+}
+
+// listMyWallPosts는 내가 모든 담벼락에 쓴 글을 최신순으로 준다. ?before=<id>로 더 불러온다.
+func (s *server) listMyWallPosts(w http.ResponseWriter, r *http.Request) {
+	sql := `SELECT p.id, p.body,
+		to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
+		p.artist_id, COALESCE(ar.display_name, ar.name) AS artist_name, ar.image_url AS artist_image_url
+		FROM artist_wall_posts p JOIN artists ar ON ar.id = p.artist_id
+		WHERE p.user_id = $1 AND p.deleted_at IS NULL`
+	args := []any{currentUser(r).ID}
+	if before := queryIntPtr(r, "before"); before != nil {
+		args = append(args, *before)
+		sql += " AND p.id < $2"
+	}
+	sql += " ORDER BY p.id DESC LIMIT " + strconv.Itoa(myWallPageSize)
+	rows, err := s.db.Query(r.Context(), sql, args...)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	posts, err := pgx.CollectRows(rows, pgx.RowToStructByName[MyWallPost])
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	if posts == nil {
+		posts = []MyWallPost{}
+	}
+	writeJSON(w, 200, posts)
+}

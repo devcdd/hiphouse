@@ -33,3 +33,17 @@ export const fetchWallQuota = (artistId: string) =>
 
 export const fetchWallCount = (artistId: string) =>
   apiGet<{ count: number }>(`/artists/${encodeURIComponent(artistId)}/wall/count`)
+
+export interface MyWallPost {
+  id: number
+  body: string
+  created_at: string
+  artist_id: string
+  artist_name: string | null
+  artist_image_url: string | null
+}
+
+export const MY_WALL_PAGE_SIZE = 30 // mirrors the API's myWallPageSize
+
+// 내가 모든 담벼락에 쓴 글, 최신순. before를 주면 그 id보다 오래된 페이지.
+export const fetchMyWallPosts = (before?: number) => apiGet<MyWallPost[]>('/me/wall', { before })

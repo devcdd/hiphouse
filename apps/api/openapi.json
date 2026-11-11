@@ -315,6 +315,14 @@
         "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "limit": { "type": "integer", "example": 3 }, "used": { "type": "integer" }, "unlimited": { "type": "boolean", "description": "담벼락 주인 아티스트로 인증된 본인" } } } } } } }
       }
     },
+    "/me/wall": {
+      "get": {
+        "tags": ["users"],
+        "summary": "내가 담벼락에 쓴 글 모아보기 (최신순 30개)",
+        "parameters": [{ "name": "before", "in": "query", "schema": { "type": "integer" }, "description": "이 id보다 오래된 글" }],
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "integer" }, "body": { "type": "string" }, "created_at": { "type": "string", "format": "date-time" }, "artist_id": { "type": "string" }, "artist_name": { "type": "string", "nullable": true }, "artist_image_url": { "type": "string", "nullable": true } } } } } } } }
+      }
+    },
     "/me/artist-claim": {
       "get": {
         "tags": ["users"],
