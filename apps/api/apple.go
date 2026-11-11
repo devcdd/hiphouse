@@ -586,7 +586,12 @@ func (s *server) linkAppleArtists(ctx context.Context, albumID string, apple []a
 		}
 		// l=ko 응답은 한글 표기(디핵)라 Spotify 영문명(D-Hack)과 안 맞는다 — 관리자가
 		// 등록한 한글 표시 이름·연관검색어까지 대조한다.
-		a, ok := matchAppleArtist(byName, append([]string{c.Name, c.DisplayName}, c.Aliases...))
+		a, ok := matchAppleArtist(byName, []string{c.Name, c.DisplayName})
+		// 연관검색어엔 크루 멤버 이름도 들어 있다 (Just Music → 율음). 크루로만 크레딧된
+		// 앨범을 Apple이 멤버별로 나열하면 Apple 쪽이 더 많아지므로, 그때는 연관검색어로 잇지 않는다.
+		if !ok && len(apple) <= c.Total {
+			a, ok = matchAppleArtist(byName, c.Aliases)
+		}
 		if !ok && c.Total == 1 && len(apple) == 1 {
 			a, ok = apple[0], true
 		}
@@ -598,10 +603,11 @@ func (s *server) linkAppleArtists(ctx context.Context, albumID string, apple []a
 			`UPDATE artists SET apple_id=$2, genres=CASE WHEN cardinality($3::text[]) > 0 THEN $3 ELSE genres END,
 			   display_name = CASE WHEN display_name IS NULL AND lower($4::text) <> lower(COALESCE(name, '')) THEN $4::text ELSE display_name END
 			 WHERE id=$1 AND apple_id IS NULL
+			   AND NOT EXISTS (SELECT 1 FROM artists o WHERE o.apple_id = $2 AND o.id <> $1)
 			 RETURNING COALESCE(display_name = $4::text AND lower($4::text) <> lower(COALESCE(name, '')), false)`,
 			c.ID, a.ID, amGenres(a.Attributes.GenreNames), koreanName(a.Attributes.Name)).Scan(&gotName)
 		if errors.Is(err, pgx.ErrNoRows) {
-			continue // 같은 배치의 다른 앨범이 먼저 연결함
+			continue // 같은 배치의 다른 앨범이 먼저 연결했거나, 그 Apple 아티스트를 이미 다른 행이 쓰고 있음
 		}
 		if err != nil {
 			return linked, named, err
