@@ -467,6 +467,72 @@ func (s *server) updateAlbumInfo(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(204)
 }
 
+// updateAlbumArtists는 크레딧을 기존 아티스트 중에서만 골라 순서대로 교체한다.
+// artists_edited_at이 찍혀서 이후 Spotify/Apple 재동기화가 크레딧을 되돌리지 않는다.
+func (s *server) updateAlbumArtists(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ArtistIDs []string `json:"artist_ids"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	seen := map[string]bool{}
+	var ids []string
+	for _, id := range body.ArtistIDs {
+		if id = strings.TrimSpace(id); id != "" && !seen[id] {
+			seen[id] = true
+			ids = append(ids, id)
+		}
+	}
+	if len(ids) == 0 {
+		writeErr(w, 400, "at least one artist is required")
+		return
+	}
+	ctx := r.Context()
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	var found int
+	if err := tx.QueryRow(ctx, "SELECT COUNT(*) FROM artists WHERE id = ANY($1)", ids).Scan(&found); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	if found != len(ids) {
+		writeErr(w, 400, "unknown artist id")
+		return
+	}
+	tag, err := tx.Exec(ctx, "UPDATE albums SET artists_edited_at=now() WHERE id=$1", r.PathValue("id"))
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		writeErr(w, 404, "album not found")
+		return
+	}
+	albumID := r.PathValue("id")
+	if _, err := tx.Exec(ctx, "DELETE FROM album_artists WHERE album_id=$1", albumID); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	for i, id := range ids {
+		if _, err := tx.Exec(ctx,
+			"INSERT INTO album_artists(album_id,artist_id,position) VALUES($1,$2,$3)", albumID, id, i); err != nil {
+			writeErr(w, 500, err.Error())
+			return
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	w.WriteHeader(204)
+}
+
 func (s *server) updateAlbumDisplayName(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		DisplayName *string `json:"display_name"`

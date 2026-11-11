@@ -197,6 +197,12 @@ const upsertAlbumRow = (db, r) =>
 export async function upsertAlbum(db, album) {
   const row = toAlbumRow(album);
   await upsertAlbumRow(db, row);
+  // 관리자가 크레딧을 고친 앨범은 album_artists를 다시 쓰지 않는다 (API updateAlbumArtists).
+  const { rows: locked } = await db.query(
+    "SELECT 1 FROM albums WHERE id=$1 AND artists_edited_at IS NOT NULL",
+    [row.id]
+  );
+  if (locked.length > 0) return;
   const artists = albumArtists(album);
   await db.query("DELETE FROM album_artists WHERE album_id=$1", [row.id]);
   for (const a of artists) {
@@ -224,6 +230,7 @@ export async function openDb() {
     -- upserts below never list it, so re-crawls preserve it.
     ALTER TABLE IF EXISTS artists ADD COLUMN IF NOT EXISTS display_name TEXT;
     ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS display_name TEXT;
+    ALTER TABLE IF EXISTS albums ADD COLUMN IF NOT EXISTS artists_edited_at TIMESTAMPTZ;
     CREATE TABLE IF NOT EXISTS albums (
       id TEXT PRIMARY KEY, name TEXT NOT NULL,
       release_date TEXT, year INTEGER, album_type TEXT,

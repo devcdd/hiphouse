@@ -173,6 +173,33 @@
         }
       }
     },
+    "/albums/{id}/artists": {
+      "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+      "put": {
+        "tags": ["albums"],
+        "summary": "앨범 크레딧 아티스트 교체 (관리자 전용)",
+        "description": "이미 DB에 있는 아티스트 id만 받는다. 배열 순서가 표시 순서가 된다. 저장하면 artists_edited_at이 찍혀 이후 Spotify 재동기화·크롤러가 album_artists를 다시 쓰지 않는다.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["artist_ids"],
+                "properties": {
+                  "artist_ids": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": { "description": "수정됨" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
     "/albums/{id}/awards": {
       "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
       "get": {
