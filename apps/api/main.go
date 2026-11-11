@@ -138,6 +138,9 @@ func main() {
 	mux.HandleFunc("GET /artists/{id}/awards", s.listAwards("artist_id"))
 	mux.HandleFunc("POST /artists/{id}/awards", s.requireAdmin(s.addAward("artist_id")))
 	mux.HandleFunc("DELETE /awards/{id}", s.requireAdmin(s.deleteAward))
+	mux.HandleFunc("GET /artists/{id}/wall", s.listWallPosts)
+	mux.HandleFunc("POST /artists/{id}/wall", s.requireAuth(s.addWallPost))
+	mux.HandleFunc("DELETE /wall/{id}", s.requireAuth(s.deleteWallPost))
 	mux.HandleFunc("POST /artists/merge", s.requireAdmin(s.mergeArtists))
 	mux.HandleFunc("DELETE /artists/{id}", s.requireAdmin(s.deleteArtist))
 
@@ -389,6 +392,17 @@ func (s *server) ensureAuthSchema(ctx context.Context) error {
 		);
 		CREATE INDEX IF NOT EXISTS idx_awards_album ON awards(album_id);
 		CREATE INDEX IF NOT EXISTS idx_awards_artist ON awards(artist_id);
+
+		-- 아티스트 담벼락: 답글·수정 없는 한 줄 메시지라 앨범 comments와 따로 둔다.
+		-- 아티스트 hard delete 때 같이 지워지고, 병합 때는 mergeArtists가 master로 옮긴다.
+		CREATE TABLE IF NOT EXISTS artist_wall_posts (
+			id BIGSERIAL PRIMARY KEY,
+			artist_id TEXT NOT NULL REFERENCES artists(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			body TEXT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		);
+		CREATE INDEX IF NOT EXISTS idx_artist_wall_posts_artist ON artist_wall_posts(artist_id, id);
 
 		-- Denormalized aggregates on albums. The list query sorts by these, so as
 		-- correlated subqueries they were computed for every matching row before

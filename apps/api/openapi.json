@@ -272,6 +272,44 @@
         }
       }
     },
+    "/artists/{id}/wall": {
+      "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+      "get": {
+        "tags": ["artists"],
+        "summary": "아티스트 담벼락 메시지 목록",
+        "description": "최신 50개를 오래된 순으로 돌려준다. before를 주면 그 id보다 오래된 50개.",
+        "parameters": [{ "name": "before", "in": "query", "schema": { "type": "integer" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "integer" }, "user_id": { "type": "string" }, "nickname": { "type": "string" }, "body": { "type": "string", "example": "신보 언제 나와요" }, "created_at": { "type": "string", "format": "date-time" } } } } } } }
+        }
+      },
+      "post": {
+        "tags": ["artists"],
+        "summary": "아티스트 담벼락에 메시지 남기기 (로그인 필요)",
+        "description": "앞뒤 공백을 뺀 50자 이하. 같은 사용자가 같은 담벼락에 3초 안에 다시 쓰면 429.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "required": ["body"], "properties": { "body": { "type": "string", "maxLength": 50 } } } } }
+        },
+        "responses": {
+          "201": { "description": "등록됨", "content": { "application/json": { "schema": { "type": "object", "properties": { "id": { "type": "integer" }, "user_id": { "type": "string" }, "nickname": { "type": "string" }, "body": { "type": "string", "example": "신보 언제 나와요" }, "created_at": { "type": "string", "format": "date-time" } } } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "description": "너무 빠르게 연속 작성" }
+        }
+      }
+    },
+    "/wall/{id}": {
+      "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+      "delete": {
+        "tags": ["artists"],
+        "summary": "담벼락 메시지 삭제 (작성자 또는 관리자)",
+        "responses": {
+          "204": { "description": "삭제됨" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
     "/awards/{id}": {
       "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
       "delete": {
