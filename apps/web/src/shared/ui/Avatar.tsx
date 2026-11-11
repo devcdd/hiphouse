@@ -19,7 +19,7 @@ export function Avatar({ src, name, size = '100%', shape = 'circle', className }
     .join(' ')
   return (
     <div className={classes} style={{ width: size }}>
-      {src ? <img src={src} alt={name} loading="lazy" /> : name.slice(0, 1)}
+      {src ? <img src={src} alt={name} loading="lazy" /> : <span className={styles.initial}>{name.slice(0, 1)}</span>}
     </div>
   )
 }
