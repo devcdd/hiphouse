@@ -10,10 +10,14 @@
   font-weight: 700;
   color: var(--muted);
   text-transform: uppercase;
-  /* Fallback initial scales with the avatar instead of needing a size prop. */
   container-type: inline-size;
-  font-size: 42cqw;
   line-height: 1;
+}
+
+/* cqw는 조상 컨테이너 기준이라 자식에 걸어야 아바타 크기를 따라간다. 아바타 자체에 걸면
+   조상에 컨테이너가 없을 때 뷰포트 기준이 돼서 글자가 아바타 밖으로 잘려 나간다. */
+.initial {
+  font-size: 42cqw;
 }
 
 /* Rounded square variant — % keeps the corner radius proportional to the size.
