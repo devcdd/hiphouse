@@ -1,10 +1,9 @@
 import { useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Globe, Lock } from 'lucide-react'
+import { Globe, Lock, Star } from 'lucide-react'
 import { AlbumCard, AlbumCardSkeleton } from '@/entities/album'
 import { useAuth, updateProfilePublic } from '@/entities/session'
 import type { User } from '@/entities/session'
-import { StarRating } from '@/features/rate-album'
 import { useToast } from '@/shared/ui/toast'
 import { fetchPublicRatedAlbums, fetchPublicUser } from '../api/userApi'
 import styles from './UserProfilePage.module.css'
@@ -65,7 +64,13 @@ export function UserProfilePage() {
             {rated.data?.map((a) => (
               <div key={a.id} className={styles.item}>
                 <AlbumCard album={a} />
-                <StarRating score={a.score} size={15} />
+                <p className={styles.givenScore}>
+                  <span className={styles.givenLabel}>{isOwner ? '내가' : `${u?.nickname}님이`} 준 평점</span>
+                  <span className={styles.givenValue}>
+                    <Star size={13} strokeWidth={2.2} fill="currentColor" aria-hidden />
+                    {(a.score / 2).toFixed(1)}
+                  </span>
+                </p>
               </div>
             ))}
             {(profile.isLoading || rated.isLoading) &&
