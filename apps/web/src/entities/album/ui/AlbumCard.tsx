@@ -60,8 +60,6 @@ export function AlbumCard({ album, given }: Props) {
               The count in parens is COMMENTS, not raters — rating_count stays off-card. */}
           {album.rating_count > 0 && album.rating_avg != null && (
             <span className={styles.rating} title={`평균 별점 ${album.rating_avg.toFixed(1)} · 댓글 ${album.comment_count}개`}>
-              {/* 커버 위 칩이 같은 별+숫자 모양이라 평균 쪽에 이름을 붙여 구분한다. */}
-              {given && <span className={styles.avgLabel}>평균</span>}
               <Star size={12} strokeWidth={2.2} fill="currentColor" />
               {album.rating_avg.toFixed(1)}
               {album.comment_count > 0 && <span className={styles.count}>({album.comment_count})</span>}
