@@ -102,6 +102,32 @@
   position: relative;
 }
 
+/* 카드 footer에 평균 별점이 이미 있어서 이 줄은 라벨을 붙여 구분한다. 닉네임이 길면 라벨만 줄인다. */
+.givenScore {
+  margin: 8px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.givenLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.givenValue {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 700;
+  color: #f5b301;
+}
+
 .state {
   color: var(--muted);
   padding: 8px 0;
