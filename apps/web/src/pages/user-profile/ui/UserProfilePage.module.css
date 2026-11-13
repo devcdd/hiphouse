@@ -110,6 +110,10 @@
   position: relative;
 }
 
+.sentinel {
+  height: 1px;
+}
+
 .state {
   color: var(--muted);
   padding: 8px 0;

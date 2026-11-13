@@ -29,10 +29,11 @@ func (s *server) listRatings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, ratings)
 }
 
-// ratedOrderBy는 평가 목록(내 목록, 공개 프로필)의 정렬이다. 어느 정렬이든 최근 평가순으로
-// 끝나서 동점인 앨범 순서가 고정된다. release_date는 ISO 텍스트라 문자열 정렬이 곧 날짜 정렬이다.
+// ratedOrderBy는 평가 목록(내 목록, 공개 프로필)의 정렬이다. 어느 정렬이든 최근 평가순으로 끝나고,
+// 그래도 같으면 앨범 id로 가른다. 순서가 완전히 정해져야 offset으로 넘길 때 앨범이 겹치거나 빠지지 않는다.
+// release_date는 ISO 텍스트라 문자열 정렬이 곧 날짜 정렬이다.
 func ratedOrderBy(sort string) string {
-	const recent = "rt.updated_at DESC"
+	const recent = "rt.updated_at DESC, albums.id"
 	switch sort {
 	case "score":
 		return "rt.score DESC, " + recent
