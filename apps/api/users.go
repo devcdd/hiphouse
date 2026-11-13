@@ -136,21 +136,23 @@ func (s *server) getPublicUser(w http.ResponseWriter, r *http.Request) {
 // public-profile list must carry this same guard.
 const profilePrivacyGuard = "EXISTS (SELECT 1 FROM users pu WHERE pu.id = $1 AND (pu.profile_public OR pu.id = $4))"
 
-// publicRatedAlbumsSQL — 이 사용자가 평가한 앨범, 최근 평가순. 소프트 삭제된 앨범은
+// publicRatedAlbumsSQL — 이 사용자가 평가한 앨범, 정렬은 ratedOrderBy. 소프트 삭제된 앨범은
 // 빠진다 (프로필은 공개 페이지지 관리자 화면이 아니다). 비공개 프로필은 주인 말고는
 // 0행이고, 화면이 "평가 없음" 대신 "비공개"라고 말하게 하는 건 헤더의 profile_public이다.
 //
 // $1은 프로필 주인, $4는 caller(비로그인이면 ""). 가드는 주인을 자기 플래그에 묶고,
 // 그 뒤를 읽을 수 있는 건 주인뿐이다.
-const publicRatedAlbumsSQL = "SELECT " + albumSelectCols + ", rt.score " +
-	"FROM albums JOIN ratings rt ON rt.album_id = albums.id " +
-	"WHERE rt.user_id = $1 AND albums.deleted_at IS NULL AND " + profilePrivacyGuard + " " +
-	"ORDER BY rt.updated_at DESC LIMIT $2 OFFSET $3"
+func publicRatedAlbumsSQL(sort string) string {
+	return "SELECT " + albumSelectCols + ", rt.score " +
+		"FROM albums JOIN ratings rt ON rt.album_id = albums.id " +
+		"WHERE rt.user_id = $1 AND albums.deleted_at IS NULL AND " + profilePrivacyGuard + " " +
+		"ORDER BY " + ratedOrderBy(sort) + " LIMIT $2 OFFSET $3"
+}
 
-// GET /users/{id}/ratings
+// GET /users/{id}/ratings?sort=
 func (s *server) listPublicRatedAlbums(w http.ResponseWriter, r *http.Request) {
 	limit, offset := clampPage(r)
-	rows, err := s.db.Query(r.Context(), publicRatedAlbumsSQL, r.PathValue("id"), limit, offset, s.callerID(r))
+	rows, err := s.db.Query(r.Context(), publicRatedAlbumsSQL(r.URL.Query().Get("sort")), r.PathValue("id"), limit, offset, s.callerID(r))
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return

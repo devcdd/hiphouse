@@ -6,7 +6,13 @@ import { displayName } from '@/shared/lib/displayName'
 import { awardHostLabel } from '@/shared/lib/awardHosts'
 import styles from './AlbumCard.module.css'
 
-export function AlbumCard({ album }: { album: Album }) {
+interface Props {
+  album: Album
+  // 이 목록의 주인이 준 평점(하프스타 1..10). 평가 목록에서만 넘긴다. label은 "내가 준 평점" 같은 읽기용 문구.
+  given?: { score: number; label: string }
+}
+
+export function AlbumCard({ album, given }: Props) {
   const albumHref = `/albums/${encodeURIComponent(album.id)}`
   const title = displayName(album)
   // Each credited artist carries its own Spotify id, so every name links to that artist.
@@ -14,13 +20,21 @@ export function AlbumCard({ album }: { album: Album }) {
 
   return (
     <article className={styles.card}>
-      <Link to={albumHref} className={styles.art} aria-label={title}>
-        {album.image_url ? (
-          <img src={album.image_url} alt={title} loading="lazy" />
-        ) : (
-          <div className={styles.placeholder}>{title.slice(0, 1)}</div>
+      <div className={styles.artWrap}>
+        <Link to={albumHref} className={styles.art} aria-label={title}>
+          {album.image_url ? (
+            <img src={album.image_url} alt={title} loading="lazy" />
+          ) : (
+            <div className={styles.placeholder}>{title.slice(0, 1)}</div>
+          )}
+        </Link>
+        {given && (
+          <span className={styles.given} role="img" aria-label={`${given.label} ${(given.score / 2).toFixed(1)}`}>
+            <Star size={13} strokeWidth={2.2} fill="currentColor" aria-hidden />
+            {(given.score / 2).toFixed(1)}
+          </span>
         )}
-      </Link>
+      </div>
       <div className={styles.meta}>
         <div className={styles.titleRow}>
           <Link to={albumHref} className={styles.name} title={title}>
@@ -46,6 +60,8 @@ export function AlbumCard({ album }: { album: Album }) {
               The count in parens is COMMENTS, not raters — rating_count stays off-card. */}
           {album.rating_count > 0 && album.rating_avg != null && (
             <span className={styles.rating} title={`평균 별점 ${album.rating_avg.toFixed(1)} · 댓글 ${album.comment_count}개`}>
+              {/* 커버 위 칩이 같은 별+숫자 모양이라 평균 쪽에 이름을 붙여 구분한다. */}
+              {given && <span className={styles.avgLabel}>평균</span>}
               <Star size={12} strokeWidth={2.2} fill="currentColor" />
               {album.rating_avg.toFixed(1)}
               {album.comment_count > 0 && <span className={styles.count}>({album.comment_count})</span>}

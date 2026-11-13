@@ -1,5 +1,5 @@
 import { apiGet } from '@/shared/api/client'
-import type { Album } from '@/entities/album'
+import type { RatedAlbum } from '@/features/rate-album'
 
 export interface PublicUser {
   id: string
@@ -11,13 +11,10 @@ export interface PublicUser {
   comment_count: number
 }
 
-// 앨범 카드 + 이 프로필 주인이 준 점수(하프스타 1..10).
-export type RatedAlbum = Album & { score: number }
-
 export function fetchPublicUser(id: string): Promise<PublicUser> {
   return apiGet<PublicUser>(`/users/${encodeURIComponent(id)}`)
 }
 
-export function fetchPublicRatedAlbums(id: string): Promise<RatedAlbum[]> {
-  return apiGet<RatedAlbum[]>(`/users/${encodeURIComponent(id)}/ratings`, { limit: 60 })
+export function fetchPublicRatedAlbums(id: string, sort?: string): Promise<RatedAlbum[]> {
+  return apiGet<RatedAlbum[]>(`/users/${encodeURIComponent(id)}/ratings`, { limit: 60, sort })
 }

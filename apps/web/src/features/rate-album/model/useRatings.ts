@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { fetchRatings, fetchRatedAlbums, setRating, removeRating } from '@/features/rate-album/api/ratingApi'
+import { toRatedSortParam, type RatedSortKey } from './ratedSort'
 import { useToast } from '@/shared/ui/toast'
 
 export function useRatings(enabled: boolean) {
@@ -8,8 +9,14 @@ export function useRatings(enabled: boolean) {
 }
 
 // Full rated-album rows (for the my-page grid).
-export function useRatedAlbums(enabled: boolean) {
-  return useQuery({ queryKey: ['rated-albums'], queryFn: fetchRatedAlbums, enabled, staleTime: 60_000 })
+export function useRatedAlbums(enabled: boolean, sort: RatedSortKey) {
+  return useQuery({
+    queryKey: ['rated-albums', sort],
+    queryFn: () => fetchRatedAlbums(toRatedSortParam(sort)),
+    enabled,
+    staleTime: 60_000,
+    placeholderData: keepPreviousData, // 정렬을 바꿀 때 목록이 스켈레톤으로 깜빡이지 않게
+  })
 }
 
 // album id → score in half-stars (empty when logged out).

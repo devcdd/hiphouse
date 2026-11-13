@@ -8,16 +8,36 @@ import (
 // 프로필 비공개의 강제 지점은 이 가드 한 줄뿐이다. 쿼리를 손보다 조건을 흘리면
 // 비공개로 돌린 사용자의 평가가 그대로 공개 프로필에 다시 뜬다.
 func TestPublicRatedAlbumsGuardsPrivacy(t *testing.T) {
-	if !strings.Contains(publicRatedAlbumsSQL, profilePrivacyGuard) {
-		t.Fatalf("privacy guard missing from the public ratings query: %s", publicRatedAlbumsSQL)
+	// 가드는 정렬과 무관하게 붙어야 한다.
+	for _, sort := range []string{"", "score", "release", "nonsense"} {
+		sql := publicRatedAlbumsSQL(sort)
+		if !strings.Contains(sql, profilePrivacyGuard) {
+			t.Fatalf("privacy guard missing from the public ratings query (sort=%q): %s", sort, sql)
+		}
+		// AND로 묶여야 한다. OR면 가드가 필터를 넓혀 삭제된 앨범까지 새어나온다.
+		if !strings.Contains(sql, "albums.deleted_at IS NULL AND "+profilePrivacyGuard) {
+			t.Fatalf("guard must be ANDed into the WHERE clause (sort=%q): %s", sort, sql)
+		}
 	}
 	// 가드는 프로필 주인($1)에 걸려야 한다 — 다른 자리 값에 걸리면 항상 통과한다.
 	if !strings.Contains(profilePrivacyGuard, "pu.id = $1") || !strings.Contains(profilePrivacyGuard, "pu.profile_public") {
 		t.Fatalf("guard must bind the profile owner to their own flag: %s", profilePrivacyGuard)
 	}
-	// AND로 묶여야 한다. OR면 가드가 필터를 넓혀 삭제된 앨범까지 새어나온다.
-	if !strings.Contains(publicRatedAlbumsSQL, "albums.deleted_at IS NULL AND "+profilePrivacyGuard) {
-		t.Fatalf("guard must be ANDed into the WHERE clause: %s", publicRatedAlbumsSQL)
+}
+
+// 어느 정렬이든 최근 평가순으로 끝나야 동점인 앨범 순서가 요청마다 흔들리지 않는다.
+// sort는 쿼리 문자열에서 오므로 모르는 값은 그대로 SQL에 들어가지 않고 기본 정렬로 떨어져야 한다.
+func TestRatedOrderBy(t *testing.T) {
+	for _, tc := range []struct{ sort, want string }{
+		{"", "rt.updated_at DESC"},
+		{"rated", "rt.updated_at DESC"},
+		{"score", "rt.score DESC, rt.updated_at DESC"},
+		{"release", "albums.release_date DESC NULLS LAST, albums.year DESC NULLS LAST, rt.updated_at DESC"},
+		{"rt.score; DROP TABLE ratings", "rt.updated_at DESC"},
+	} {
+		if got := ratedOrderBy(tc.sort); got != tc.want {
+			t.Errorf("ratedOrderBy(%q) = %q, want %q", tc.sort, got, tc.want)
+		}
 	}
 }
 
@@ -53,7 +73,7 @@ func TestOwnerBypassBindsCaller(t *testing.T) {
 		t.Errorf("ratings guard must OR the owner check onto the flag: %s", profilePrivacyGuard)
 	}
 	// caller는 placeholder여야 한다 — 문자열로 이어붙이면 SQL 인젝션이다.
-	for _, sql := range []string{publicUserSQL, publicRatedAlbumsSQL} {
+	for _, sql := range []string{publicUserSQL, publicRatedAlbumsSQL("")} {
 		if strings.Contains(sql, "'") && strings.Contains(sql, "u.id = '") {
 			t.Errorf("caller id must be a bind parameter, not inlined: %s", sql)
 		}
