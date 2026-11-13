@@ -1,7 +1,8 @@
 import { useParams } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Globe, Lock, Star } from 'lucide-react'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Globe, Lock } from 'lucide-react'
 import { AlbumCard, AlbumCardSkeleton } from '@/entities/album'
+import { RatedSortSelect, toRatedSortParam, useRatedSort } from '@/features/rate-album'
 import { useAuth, updateProfilePublic } from '@/entities/session'
 import type { User } from '@/entities/session'
 import { useToast } from '@/shared/ui/toast'
@@ -23,11 +24,14 @@ export function UserProfilePage() {
   const profile = useQuery({ queryKey: ['user', id], queryFn: () => fetchPublicUser(id), enabled: !!id })
   // 주인이 아닐 때만 가린다. 서버도 같은 기준이라 hidden이면 목록은 어차피 빈 배열이다.
   const hidden = !isOwner && profile.data?.profile_public === false
+  const [sort, setSort] = useRatedSort()
   const rated = useQuery({
-    queryKey: ['user-ratings', id],
+    queryKey: ['user-ratings', id, sort],
     // 프로필 헤더가 404면 목록도 볼 필요 없다.
     enabled: !!id && profile.isSuccess && !hidden,
-    queryFn: () => fetchPublicRatedAlbums(id),
+    queryFn: () => fetchPublicRatedAlbums(id, toRatedSortParam(sort)),
+    // 정렬만 바뀔 때는 이전 목록을 유지한다. 다른 사용자로 넘어갈 때까지 유지하면 남의 목록이 잠깐 보인다.
+    placeholderData: (prev, prevQuery) => (prevQuery?.queryKey[1] === id ? keepPreviousData(prev) : undefined),
   })
 
   if (profile.error) return <p className={styles.state}>프로필을 불러오지 못했습니다.</p>
@@ -54,7 +58,12 @@ export function UserProfilePage() {
         {isOwner && <PrivacyToggle />}
       </header>
 
-      {!hidden && <h2 className={styles.section}>평가한 앨범</h2>}
+      {!hidden && (
+        <div className={styles.sectionRow}>
+          <h2 className={styles.section}>평가한 앨범</h2>
+          {(rated.data?.length ?? 0) > 0 && <RatedSortSelect value={sort} onChange={setSort} />}
+        </div>
+      )}
       {hidden ? (
         <p className={styles.state}>이 사용자는 활동을 비공개로 설정했습니다.</p>
       ) : (
@@ -63,14 +72,10 @@ export function UserProfilePage() {
           <div className={styles.grid}>
             {rated.data?.map((a) => (
               <div key={a.id} className={styles.item}>
-                <AlbumCard album={a} />
-                <p className={styles.givenScore}>
-                  <span className={styles.givenLabel}>{isOwner ? '내가' : `${u?.nickname}님이`} 준 평점</span>
-                  <span className={styles.givenValue}>
-                    <Star size={13} strokeWidth={2.2} fill="currentColor" aria-hidden />
-                    {(a.score / 2).toFixed(1)}
-                  </span>
-                </p>
+                <AlbumCard
+                  album={a}
+                  given={{ score: a.score, label: `${isOwner ? '내가' : `${u?.nickname}님이`} 준 평점` }}
+                />
               </div>
             ))}
             {(profile.isLoading || rated.isLoading) &&

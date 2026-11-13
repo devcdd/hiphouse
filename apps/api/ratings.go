@@ -29,17 +29,31 @@ func (s *server) listRatings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, ratings)
 }
 
-// listRatedAlbums returns the full album rows the user has rated, most-recently
-// rated first — mirrors listFavorites so the my-page can render album cards.
+// ratedOrderBy는 평가 목록(내 목록, 공개 프로필)의 정렬이다. 어느 정렬이든 최근 평가순으로
+// 끝나서 동점인 앨범 순서가 고정된다. release_date는 ISO 텍스트라 문자열 정렬이 곧 날짜 정렬이다.
+func ratedOrderBy(sort string) string {
+	const recent = "rt.updated_at DESC"
+	switch sort {
+	case "score":
+		return "rt.score DESC, " + recent
+	case "release":
+		return "albums.release_date DESC NULLS LAST, albums.year DESC NULLS LAST, " + recent
+	}
+	return recent
+}
+
+// listRatedAlbums returns the full album rows the user has rated plus the score
+// they gave — mirrors listFavorites so the my-page can render album cards.
+// GET /ratings/albums?sort=
 func (s *server) listRatedAlbums(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.db.Query(r.Context(),
-		"SELECT "+albumSelectCols+" FROM albums JOIN ratings rt ON rt.album_id=albums.id "+
-			"WHERE rt.user_id=$1 ORDER BY rt.updated_at DESC", currentUser(r).ID)
+		"SELECT "+albumSelectCols+", rt.score FROM albums JOIN ratings rt ON rt.album_id=albums.id "+
+			"WHERE rt.user_id=$1 ORDER BY "+ratedOrderBy(r.URL.Query().Get("sort")), currentUser(r).ID)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	albums, err := pgx.CollectRows(rows, pgx.RowToStructByName[Album])
+	albums, err := pgx.CollectRows(rows, pgx.RowToStructByName[RatedAlbum])
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return

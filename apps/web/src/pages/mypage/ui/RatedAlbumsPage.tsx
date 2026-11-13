@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { AlbumCard, AlbumCardSkeleton } from '@/entities/album'
-import { useRatedAlbums } from '@/features/rate-album'
+import { RatedSortSelect, useRatedAlbums, useRatedSort } from '@/features/rate-album'
 import { AuthGate } from './AuthGate'
 import styles from './MyPage.module.css'
 
@@ -14,7 +14,9 @@ export function RatedAlbumsPage() {
 }
 
 function RatedList() {
-  const { data: albums, isLoading } = useRatedAlbums(true) // AuthGate guarantees authed
+  const [sort, setSort] = useRatedSort()
+  const { data: albums, isLoading } = useRatedAlbums(true, sort) // AuthGate guarantees authed
+  const empty = !isLoading && (albums?.length ?? 0) === 0
 
   return (
     <div className={styles.page}>
@@ -22,14 +24,17 @@ function RatedList() {
         <ChevronLeft size={16} aria-hidden />
         마이페이지
       </Link>
-      <h1 className={styles.title}>내가 평가한 앨범</h1>
-      {!isLoading && (albums?.length ?? 0) === 0 ? (
+      <div className={styles.titleRow}>
+        <h1 className={styles.title}>내가 평가한 앨범</h1>
+        {!empty && <RatedSortSelect value={sort} onChange={setSort} />}
+      </div>
+      {empty ? (
         <p className={styles.state}>아직 평가한 앨범이 없습니다.</p>
       ) : (
         <div className={styles.grid}>
           {albums?.map((a) => (
             <div key={a.id} className={styles.item}>
-              <AlbumCard album={a} />
+              <AlbumCard album={a} given={{ score: a.score, label: '내가 준 평점' }} />
             </div>
           ))}
           {isLoading &&

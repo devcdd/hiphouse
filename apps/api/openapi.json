@@ -418,9 +418,10 @@
       "get": {
         "tags": ["users"],
         "summary": "그 사용자가 평가한 앨범",
-        "description": "앨범 행에 그 사용자가 준 score(하프스타 1..10)를 얹어 최근 평가순으로 반환. 삭제된 앨범은 제외. 프로필 비공개 사용자는 빈 배열 — 비공개인지 평가가 없는지는 GET /users/{id}의 profile_public으로 구분한다. Bearer 토큰의 주인이 이 프로필 본인이면 비공개여도 목록이 그대로 나간다.",
+        "description": "앨범 행에 그 사용자가 준 score(하프스타 1..10)를 얹어 반환. 정렬은 sort로 고르고 기본은 최근 평가순. 삭제된 앨범은 제외. 프로필 비공개 사용자는 빈 배열 — 비공개인지 평가가 없는지는 GET /users/{id}의 profile_public으로 구분한다. Bearer 토큰의 주인이 이 프로필 본인이면 비공개여도 목록이 그대로 나간다.",
         "parameters": [
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "sort", "in": "query", "schema": { "type": "string", "enum": ["rated", "score", "release"], "default": "rated" }, "description": "rated = 최근 평가순, score = 그 사용자가 준 별점 높은 순, release = 발매일 최신순. 동점은 최근 평가순" },
           { "name": "limit", "in": "query", "schema": { "type": "integer" } },
           { "name": "offset", "in": "query", "schema": { "type": "integer" } }
         ],
