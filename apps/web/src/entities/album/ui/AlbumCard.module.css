@@ -152,8 +152,7 @@
   color: #f5b301;
 }
 
-.count,
-.avgLabel {
+.count {
   font-weight: 600;
   color: var(--muted);
 }
