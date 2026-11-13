@@ -25,15 +25,15 @@ func TestPublicRatedAlbumsGuardsPrivacy(t *testing.T) {
 	}
 }
 
-// 어느 정렬이든 최근 평가순으로 끝나야 동점인 앨범 순서가 요청마다 흔들리지 않는다.
+// 어느 정렬이든 최근 평가순과 앨범 id로 끝나야 페이지를 넘길 때 동점인 앨범이 겹치거나 빠지지 않는다.
 // sort는 쿼리 문자열에서 오므로 모르는 값은 그대로 SQL에 들어가지 않고 기본 정렬로 떨어져야 한다.
 func TestRatedOrderBy(t *testing.T) {
 	for _, tc := range []struct{ sort, want string }{
-		{"", "rt.updated_at DESC"},
-		{"rated", "rt.updated_at DESC"},
-		{"score", "rt.score DESC, rt.updated_at DESC"},
-		{"release", "albums.release_date DESC NULLS LAST, albums.year DESC NULLS LAST, rt.updated_at DESC"},
-		{"rt.score; DROP TABLE ratings", "rt.updated_at DESC"},
+		{"", "rt.updated_at DESC, albums.id"},
+		{"rated", "rt.updated_at DESC, albums.id"},
+		{"score", "rt.score DESC, rt.updated_at DESC, albums.id"},
+		{"release", "albums.release_date DESC NULLS LAST, albums.year DESC NULLS LAST, rt.updated_at DESC, albums.id"},
+		{"rt.score; DROP TABLE ratings", "rt.updated_at DESC, albums.id"},
 	} {
 		if got := ratedOrderBy(tc.sort); got != tc.want {
 			t.Errorf("ratedOrderBy(%q) = %q, want %q", tc.sort, got, tc.want)

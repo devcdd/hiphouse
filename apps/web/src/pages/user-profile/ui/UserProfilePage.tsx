@@ -1,12 +1,14 @@
+import { useMemo } from 'react'
 import { useParams } from 'react-router-dom'
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Globe, Lock } from 'lucide-react'
 import { AlbumCard, AlbumCardSkeleton } from '@/entities/album'
 import { RatedSortSelect, toRatedSortParam, useRatedSort } from '@/features/rate-album'
 import { useAuth, updateProfilePublic } from '@/entities/session'
 import type { User } from '@/entities/session'
+import { useInfiniteScroll } from '@/shared/lib/useInfiniteScroll'
 import { useToast } from '@/shared/ui/toast'
-import { fetchPublicRatedAlbums, fetchPublicUser } from '../api/userApi'
+import { fetchPublicRatedAlbums, fetchPublicUser, RATED_PAGE_SIZE } from '../api/userApi'
 import styles from './UserProfilePage.module.css'
 
 const joined = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'long' })
@@ -25,14 +27,18 @@ export function UserProfilePage() {
   // 주인이 아닐 때만 가린다. 서버도 같은 기준이라 hidden이면 목록은 어차피 빈 배열이다.
   const hidden = !isOwner && profile.data?.profile_public === false
   const [sort, setSort] = useRatedSort()
-  const rated = useQuery({
+  const rated = useInfiniteQuery({
     queryKey: ['user-ratings', id, sort],
     // 프로필 헤더가 404면 목록도 볼 필요 없다.
     enabled: !!id && profile.isSuccess && !hidden,
-    queryFn: () => fetchPublicRatedAlbums(id, toRatedSortParam(sort)),
+    queryFn: ({ pageParam }) => fetchPublicRatedAlbums(id, toRatedSortParam(sort), pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (last, pages) => (last.length < RATED_PAGE_SIZE ? undefined : pages.length * RATED_PAGE_SIZE),
     // 정렬만 바뀔 때는 이전 목록을 유지한다. 다른 사용자로 넘어갈 때까지 유지하면 남의 목록이 잠깐 보인다.
     placeholderData: (prev, prevQuery) => (prevQuery?.queryKey[1] === id ? keepPreviousData(prev) : undefined),
   })
+  const albums = useMemo(() => rated.data?.pages.flat() ?? [], [rated.data])
+  const sentinel = useInfiniteScroll<HTMLDivElement>(rated.fetchNextPage, rated.hasNextPage && !rated.isFetching)
 
   if (profile.error) return <p className={styles.state}>프로필을 불러오지 못했습니다.</p>
 
@@ -61,16 +67,16 @@ export function UserProfilePage() {
       {!hidden && (
         <div className={styles.sectionRow}>
           <h2 className={styles.section}>평가한 앨범</h2>
-          {(rated.data?.length ?? 0) > 0 && <RatedSortSelect value={sort} onChange={setSort} />}
+          {albums.length > 0 && <RatedSortSelect value={sort} onChange={setSort} />}
         </div>
       )}
       {hidden ? (
         <p className={styles.state}>이 사용자는 활동을 비공개로 설정했습니다.</p>
       ) : (
         <>
-          {rated.isSuccess && rated.data.length === 0 && <p className={styles.state}>아직 평가한 앨범이 없습니다.</p>}
+          {rated.isSuccess && albums.length === 0 && <p className={styles.state}>아직 평가한 앨범이 없습니다.</p>}
           <div className={styles.grid}>
-            {rated.data?.map((a) => (
+            {albums.map((a) => (
               <div key={a.id} className={styles.item}>
                 <AlbumCard
                   album={a}
@@ -85,6 +91,8 @@ export function UserProfilePage() {
                 </div>
               ))}
           </div>
+          {rated.hasNextPage && <div ref={sentinel} className={styles.sentinel} />}
+          {rated.isFetchingNextPage && <p className={styles.state}>불러오는 중…</p>}
         </>
       )}
     </div>

@@ -15,6 +15,8 @@ export function fetchPublicUser(id: string): Promise<PublicUser> {
   return apiGet<PublicUser>(`/users/${encodeURIComponent(id)}`)
 }
 
-export function fetchPublicRatedAlbums(id: string, sort?: string): Promise<RatedAlbum[]> {
-  return apiGet<RatedAlbum[]>(`/users/${encodeURIComponent(id)}/ratings`, { limit: 60, sort })
+export const RATED_PAGE_SIZE = 60
+
+export function fetchPublicRatedAlbums(id: string, sort: string | undefined, offset: number): Promise<RatedAlbum[]> {
+  return apiGet<RatedAlbum[]>(`/users/${encodeURIComponent(id)}/ratings`, { limit: RATED_PAGE_SIZE, offset, sort })
 }
