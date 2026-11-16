@@ -20,21 +20,13 @@ export function AlbumCard({ album, given }: Props) {
 
   return (
     <article className={styles.card}>
-      <div className={styles.artWrap}>
-        <Link to={albumHref} className={styles.art} aria-label={title}>
-          {album.image_url ? (
-            <img src={album.image_url} alt={title} loading="lazy" />
-          ) : (
-            <div className={styles.placeholder}>{title.slice(0, 1)}</div>
-          )}
-        </Link>
-        {given && (
-          <span className={styles.given} role="img" aria-label={`${given.label} ${(given.score / 2).toFixed(1)}`}>
-            <Star size={13} strokeWidth={2.2} fill="currentColor" aria-hidden />
-            {(given.score / 2).toFixed(1)}
-          </span>
+      <Link to={albumHref} className={styles.art} aria-label={title}>
+        {album.image_url ? (
+          <img src={album.image_url} alt={title} loading="lazy" />
+        ) : (
+          <div className={styles.placeholder}>{title.slice(0, 1)}</div>
         )}
-      </div>
+      </Link>
       <div className={styles.meta}>
         <div className={styles.titleRow}>
           <Link to={albumHref} className={styles.name} title={title}>
@@ -52,6 +44,17 @@ export function AlbumCard({ album, given }: Props) {
             </Fragment>
           ))}
         </div>
+        {given && (
+          <span className={styles.given} role="img" aria-label={`${given.label} ${(given.score / 2).toFixed(1)}`}>
+            <span className={styles.givenLabel} aria-hidden>
+              {given.label}
+            </span>
+            <span className={styles.givenScore} aria-hidden>
+              <Star size={12} strokeWidth={2.2} fill="currentColor" />
+              {(given.score / 2).toFixed(1)}
+            </span>
+          </span>
+        )}
         <div className={styles.footer}>
           {(album.release_date ?? album.year) != null && (
             <span className={styles.year}>{album.release_date ?? album.year}</span>

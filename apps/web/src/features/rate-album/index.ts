@@ -1,7 +1,7 @@
 export { StarRating } from './ui/StarRating'
 export { RatingControl } from './ui/RatingControl'
 export { RatedSortSelect } from './ui/RatedSortSelect'
-export { useRatings, useRatingMap, useRatedAlbums, useSetRating } from './model/useRatings'
+export { useRatings, useRatingMap, useMyGiven, useRatedAlbums, useSetRating } from './model/useRatings'
 export { useRatedSort } from './model/useRatedSort'
 export { toRatedSortParam } from './model/ratedSort'
 export type { RatedSortKey } from './model/ratedSort'

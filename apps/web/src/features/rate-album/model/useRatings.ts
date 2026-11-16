@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { fetchRatings, fetchRatedAlbums, setRating, removeRating } from '@/features/rate-album/api/ratingApi'
 import { toRatedSortParam, type RatedSortKey } from './ratedSort'
@@ -23,6 +23,18 @@ export function useRatedAlbums(enabled: boolean, sort: RatedSortKey) {
 export function useRatingMap(enabled: boolean): Map<string, number> {
   const { data } = useRatings(enabled)
   return useMemo(() => new Map((data ?? []).map((r) => [r.album_id, r.score])), [data])
+}
+
+// AlbumCard의 given prop으로 바로 넘기는 내 평점. 평가하지 않은 앨범이면 undefined.
+export function useMyGiven(enabled: boolean) {
+  const ratings = useRatingMap(enabled)
+  return useCallback(
+    (albumId: string) => {
+      const score = ratings.get(albumId)
+      return score ? { score, label: '내가 준 평점' } : undefined
+    },
+    [ratings],
+  )
 }
 
 // score 0 clears the rating (clicking the same half-star again).
