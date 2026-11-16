@@ -32,13 +32,15 @@ const TABS: { key: Tab; label: string }[] = [
 ]
 
 export function AdminPage() {
-  const { isAdmin, isLoading } = useAuth()
+  const { isAdmin, isAdminUser, isLoading } = useAuth()
   const [params, setParams] = useSearchParams()
   const raw = params.get('tab')
   // 탭 목록이 곧 허용 값 — 탭을 추가할 때 여기도 고쳐야 하는 중복을 없앤다.
   const tab: Tab = TABS.some((t) => t.key === raw) ? (raw as Tab) : 'crawl'
 
   if (isLoading) return <p className={styles.state}>확인 중…</p>
+  if (isAdminUser && !isAdmin)
+    return <p className={styles.state}>관리자 모드가 꺼져 있습니다. 마이페이지에서 켜면 볼 수 있습니다.</p>
   if (!isAdmin) return <p className={styles.state}>관리자 전용 페이지입니다.</p>
 
   return (

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { fetchMe, logout } from '@/entities/session/api/authApi'
 import type { User } from '@/entities/session/model/types'
+import { useAdminMode } from './adminMode'
 import { AUTH_CLEARED_EVENT, getRefreshToken, getToken, setTokens, clearToken } from '@/shared/lib/token'
 
 // Current session, resolved from the stored token via GET /me.
@@ -15,6 +16,7 @@ import { AUTH_CLEARED_EVENT, getRefreshToken, getToken, setTokens, clearToken } 
 export function useAuth() {
   const qc = useQueryClient()
   const hasToken = !!getToken()
+  const adminMode = useAdminMode()
 
   // The API layer can drop the session on its own (refresh token expired or
   // revoked). Clearing the cached user re-renders every consumer.
@@ -49,7 +51,10 @@ export function useAuth() {
   return {
     user: user ?? null,
     isAuthed: hasToken && !!user,
-    isAdmin: user?.role === 'admin',
+    // isAdmin은 관리 도구를 그릴지 판단하는 값이라 관리자 모드를 끄면 false가 된다.
+    // 관리자 모드 스위치처럼 실제 권한이 필요한 곳은 isAdminUser를 쓴다.
+    isAdmin: user?.role === 'admin' && adminMode,
+    isAdminUser: user?.role === 'admin',
     isLoading: hasToken && isLoading,
     signIn,
     signOut,
