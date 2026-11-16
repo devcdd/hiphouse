@@ -3,17 +3,19 @@
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  border: none;
+  border: 1px solid color-mix(in srgb, var(--fg) 18%, transparent);
   border-radius: 999px;
-  background: var(--surface);
-  color: var(--muted);
+  background: var(--bg);
+  color: var(--fg);
   font-size: 0.8rem;
   font-weight: 700;
   cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
 }
 
 .btn:hover {
-  color: var(--fg);
+  border-color: color-mix(in srgb, var(--fg) 40%, transparent);
+  background: var(--surface);
 }
 
 .form {
@@ -62,6 +64,28 @@
   outline: none;
   border-color: var(--fg);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--fg) 14%, transparent);
+}
+
+/* 브라우저 기본 화살표는 테두리에 바짝 붙어서 숨기고, 입력칸 패딩만큼 안쪽에 직접 그린다. */
+.selectWrap {
+  position: relative;
+  display: block;
+}
+
+.select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 38px;
+  cursor: pointer;
+}
+
+.selectIcon {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
 }
 
 .actions {

@@ -3,17 +3,19 @@
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  border: none;
+  border: 1px solid color-mix(in srgb, var(--fg) 18%, transparent);
   border-radius: 999px;
-  background: var(--surface);
-  color: var(--muted);
+  background: var(--bg);
+  color: var(--fg);
   font-size: 0.8rem;
   font-weight: 700;
   cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
 }
 
 .btn:hover {
-  color: var(--fg);
+  border-color: color-mix(in srgb, var(--fg) 40%, transparent);
+  background: var(--surface);
 }
 
 .form {

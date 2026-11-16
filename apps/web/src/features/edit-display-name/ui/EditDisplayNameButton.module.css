@@ -3,17 +3,19 @@
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  border: none;
+  border: 1px solid color-mix(in srgb, var(--fg) 18%, transparent);
   border-radius: 999px;
-  background: var(--surface);
-  color: var(--muted);
+  background: var(--bg);
+  color: var(--fg);
   font-size: 0.8rem;
   font-weight: 700;
   cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
 }
 
 .btn:hover {
-  color: var(--fg);
+  border-color: color-mix(in srgb, var(--fg) 40%, transparent);
+  background: var(--surface);
 }
 
 .form {
@@ -74,6 +76,38 @@
 .error {
   color: #e5484d;
   font-size: 0.8rem;
+}
+
+/* full: 관리자 카드 한 줄 전체. 입력칸이 남는 폭을 쓰고 버튼은 정보 수정 폼과 같은 모양 */
+.formFull {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.formFull .input {
+  flex: 1;
+  width: auto;
+}
+
+.formFull .save {
+  padding: 8px 18px;
+}
+
+.cancelFull {
+  padding: 8px 14px;
+  border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cancelFull:hover {
+  color: var(--fg);
 }
 
 /* 좁은 화면: 고정폭 입력칸이 줄을 밀어낸다 — 남는 폭을 그대로 쓰게. */
