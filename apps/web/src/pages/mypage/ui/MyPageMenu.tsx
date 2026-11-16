@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
-import { ChevronRight, Pencil, Star, Heart, MessagesSquare, UserPlus, UserRound } from 'lucide-react'
-import { useAuth } from '@/entities/session'
+import { ChevronRight, Pencil, Star, Heart, MessagesSquare, UserPlus, UserRound, ShieldCheck } from 'lucide-react'
+import { useAuth, useAdminMode, setAdminMode } from '@/entities/session'
 import { AuthGate } from './AuthGate'
 import styles from './MyPage.module.css'
 
@@ -23,7 +23,7 @@ export function MyPageMenu() {
 }
 
 function Menu() {
-  const { user } = useAuth()
+  const { user, isAdminUser } = useAuth()
   // 공개 프로필만 user.id가 필요해 ITEMS 상수에 넣지 못한다.
   const items = user
     ? [{ to: `/users/${encodeURIComponent(user.id)}`, label: '내 공개 프로필', Icon: UserRound }, ...ITEMS]
@@ -39,7 +39,28 @@ function Menu() {
             <ChevronRight size={18} className={styles.chev} aria-hidden />
           </Link>
         ))}
+        {isAdminUser && <AdminModeToggle />}
       </nav>
     </div>
+  )
+}
+
+function AdminModeToggle() {
+  const on = useAdminMode()
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      className={styles.menuItem}
+      onClick={() => setAdminMode(!on)}
+    >
+      <ShieldCheck size={18} className={styles.menuIcon} aria-hidden />
+      <span className={styles.menuLabel}>
+        관리자 모드
+        <span className={styles.menuHint}>끄면 관리 도구를 숨기고 일반 사용자 화면으로 봅니다</span>
+      </span>
+      <span className={on ? `${styles.switch} ${styles.switchOn}` : styles.switch} aria-hidden />
+    </button>
   )
 }
