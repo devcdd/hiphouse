@@ -304,13 +304,13 @@ func TestRefreshTokenMinting(t *testing.T) {
 
 // Apple 등록 유형이 있으면 그것, 없으면 트랙 수 휴리스틱 — SQL 문자열 수준 계약.
 func TestTypeCondPrefersAppleType(t *testing.T) {
-	for _, k := range []string{"single", "ep", "album"} {
+	for _, k := range []string{"single", "ep", "album", "compilation"} {
 		c := typeCond(k)
 		if !strings.Contains(c, "COALESCE(apple_type") || !strings.HasSuffix(c, "='"+k+"')") {
 			t.Errorf("typeCond(%q) = %s", k, c)
 		}
 	}
-	if typeCond("compilation") != "" {
-		t.Errorf("compilation is not a UI filter key")
+	if typeCond("bogus") != "" {
+		t.Errorf("unknown type key must not produce a predicate")
 	}
 }

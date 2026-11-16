@@ -23,7 +23,7 @@ const effTypeExpr = `CASE WHEN album_type='compilation' THEN 'compilation'
 // typeCond maps a UI type key to its SQL predicate (values fixed → safe to inline).
 func typeCond(t string) string {
 	switch t {
-	case "single", "ep", "album":
+	case "single", "ep", "album", "compilation":
 		return "(" + effTypeExpr + "='" + t + "')"
 	}
 	return ""
