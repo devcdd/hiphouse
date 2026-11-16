@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { SquarePen } from 'lucide-react'
+import { ChevronDown, SquarePen } from 'lucide-react'
 import { updateAlbumInfo, type Album } from '@/entities/album'
 import { useAuth } from '@/entities/session'
 import styles from './EditAlbumInfoButton.module.css'
@@ -98,13 +98,16 @@ export function EditAlbumInfoButton({
       </label>
       <label className={styles.field}>
         <span>유형</span>
-        <select className={styles.input} value={form.album_type} onChange={set('album_type')}>
-          {TYPE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+        <span className={styles.selectWrap}>
+          <select className={`${styles.input} ${styles.select}`} value={form.album_type} onChange={set('album_type')}>
+            {TYPE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={16} strokeWidth={2.2} className={styles.selectIcon} aria-hidden />
+        </span>
       </label>
       <label className={styles.field}>
         <span>트랙 수</span>

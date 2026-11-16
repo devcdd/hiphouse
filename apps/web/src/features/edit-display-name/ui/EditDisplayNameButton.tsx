@@ -15,16 +15,24 @@ export function EditDisplayNameButton({
   name,
   displayName,
   albumId,
+  full = false,
+  onEditingChange,
 }: {
   kind: 'album' | 'artist' | 'track'
   id: string
   name: string // Spotify 원본명 — placeholder 및 해제 시 표시될 이름
   displayName: string | null
   albumId?: string // kind='track'일 때 트랙이 속한 앨범 id (tracks PK가 album_id+id 복합)
+  full?: boolean // 관리자 카드처럼 폼이 한 줄 전체를 쓰는 자리에서 다른 편집 폼과 같은 모양으로
+  onEditingChange?: (editing: boolean) => void // 부모가 폼 열림 동안 다른 도구를 숨기는 용도
 }) {
   const { isAdmin } = useAuth()
   const qc = useQueryClient()
-  const [editing, setEditing] = useState(false)
+  const [editing, setEditingState] = useState(false)
+  const setEditing = (v: boolean) => {
+    setEditingState(v)
+    onEditingChange?.(v)
+  }
   const [text, setText] = useState(displayName ?? '')
 
   const save = useMutation({
@@ -64,35 +72,55 @@ export function EditDisplayNameButton({
       </button>
     )
 
+  const submit = (
+    <button
+      type="submit"
+      className={styles.save}
+      disabled={save.isPending || text.trim() === (displayName ?? '')}
+    >
+      {save.isPending ? '저장 중…' : '저장'}
+    </button>
+  )
+  const input = (
+    <input
+      className={styles.input}
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      placeholder={name}
+      title="비우고 저장하면 원본 이름으로 돌아갑니다"
+      aria-label="한글 표시 이름"
+      autoFocus
+    />
+  )
+
   return (
     <form
-      className={styles.form}
+      className={full ? styles.formFull : styles.form}
       onKeyDown={(e) => e.key === 'Escape' && setEditing(false)}
       onSubmit={(e) => {
         e.preventDefault()
         save.mutate()
       }}
     >
-      <input
-        className={styles.input}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder={name}
-        title="비우고 저장하면 원본 이름으로 돌아갑니다"
-        aria-label="한글 표시 이름"
-        autoFocus
-      />
-      <button
-        type="submit"
-        className={styles.save}
-        disabled={save.isPending || text.trim() === (displayName ?? '')}
-      >
-        {save.isPending ? '저장 중…' : '저장'}
-      </button>
-      <button type="button" className={styles.cancel} onClick={() => setEditing(false)}>
-        취소
-      </button>
-      {save.isError && <span className={styles.error}>실패</span>}
+      {full ? (
+        <>
+          {input}
+          {save.isError && <span className={styles.error}>저장 실패</span>}
+          <button type="button" className={styles.cancelFull} onClick={() => setEditing(false)}>
+            취소
+          </button>
+          {submit}
+        </>
+      ) : (
+        <>
+          {input}
+          {submit}
+          <button type="button" className={styles.cancel} onClick={() => setEditing(false)}>
+            취소
+          </button>
+          {save.isError && <span className={styles.error}>실패</span>}
+        </>
+      )}
     </form>
   )
 }
