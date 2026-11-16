@@ -41,7 +41,7 @@ export function AlbumsPage() {
   }
 
   // Opened with no query at all (logo click, fresh tab) → restore the last
-  // filters, or the 정규+EP 기본값 on a first visit. Any explicit query,
+  // filters, or DEFAULT_FILTER_QUERY on a first visit. Any explicit query,
   // including one cleared back to empty, wins.
   const query = search.toString()
   useEffect(() => {

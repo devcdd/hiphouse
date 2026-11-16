@@ -1,11 +1,11 @@
-export type AlbumType = 'single' | 'ep' | 'album'
+export type AlbumType = 'single' | 'ep' | 'album' | 'compilation'
 export type SortKey = 'recent' | 'popular' | 'rating' | 'tracks'
 
 // Multi-select types -> comma-separated server param (undefined = 전체).
 export const toTypeParam = (types: AlbumType[]): string | undefined => (types.length ? types.join(',') : undefined)
 export const toSortParam = (s: SortKey): string | undefined => (s === 'recent' ? undefined : s)
 
-const VALID_TYPES = new Set<AlbumType>(['single', 'ep', 'album'])
+const VALID_TYPES = new Set<AlbumType>(['single', 'ep', 'album', 'compilation'])
 export const parseTypes = (raw: string | null): AlbumType[] =>
   (raw ?? '')
     .split(',')
@@ -15,11 +15,12 @@ export const parseTypes = (raw: string | null): AlbumType[] =>
 export const TYPE_OPTIONS: { key: AlbumType; label: string }[] = [
   { key: 'album', label: '정규' },
   { key: 'ep', label: 'EP' },
+  { key: 'compilation', label: '컴필레이션' },
   { key: 'single', label: '싱글' },
 ]
 
-// 첫 방문 기본값 — 싱글이 물량으로 피드를 덮어서 정규/EP만 켜고 시작한다.
-export const DEFAULT_FILTER_QUERY = 'type=album,ep'
+// 첫 방문 기본값. 싱글은 물량이 많아 피드를 덮기 때문에 싱글만 끄고 시작한다.
+export const DEFAULT_FILTER_QUERY = 'type=album,ep,compilation'
 
 export const SORT_OPTIONS: { key: SortKey; label: string; hint: string }[] = [
   { key: 'recent', label: '최신순', hint: '발매일이 최근인 앨범부터' },
