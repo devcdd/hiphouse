@@ -7,14 +7,12 @@ import (
 	_ "time/tzdata" // distroless 이미지엔 zoneinfo가 없다 — Asia/Seoul을 바이너리에 넣는다
 )
 
-// 서버 자체 신보 스윕: 매일 06:05 KST (신보가 00시 정각에 다 올라오진
-// 않아 5분 여유). 관리자가 신보 체크 탭을 열지 않아도 돌게 하는 것이 목적이고,
-// 탭은 수동 실행용으로 그대로 둔다.
-const (
-	sweepHour   = 6
-	sweepMinute = 5
-	sweepBatch  = 20
-)
+// 서버 자체 신보 스윕: 매일 06:05, 18:10 KST. 국내 음원은 대부분 18시에 공개돼서
+// 아침 스윕만 돌면 반나절 늦게 잡힌다. 관리자가 신보 체크 탭을 열지 않아도 돌게 하는
+// 것이 목적이고, 탭은 수동 실행용으로 그대로 둔다.
+const sweepBatch = 20
+
+var sweepTimes = [][2]int{{6, 5}, {18, 10}}
 
 // scheduleReleaseSweep은 다음 실행 시각까지 자고 스윕을 돌리길 반복한다.
 func (s *server) scheduleReleaseSweep(ctx context.Context) {
@@ -39,14 +37,20 @@ func (s *server) scheduleReleaseSweep(ctx context.Context) {
 	}
 }
 
-// nextSweep은 now 이후 첫 sweepHour:sweepMinute를 고른다. 벽시계만 보고 정해서
+// nextSweep은 now 이후 가장 가까운 sweepTimes 시각을 고른다. 벽시계만 보고 정해서
 // 재시작해도 실행 시각이 밀리지 않는다 (상태 없음).
 func nextSweep(now time.Time) time.Time {
-	t := time.Date(now.Year(), now.Month(), now.Day(), sweepHour, sweepMinute, 0, 0, now.Location())
-	if !t.After(now) {
-		t = t.AddDate(0, 0, 1)
+	var best time.Time
+	for _, hm := range sweepTimes {
+		t := time.Date(now.Year(), now.Month(), now.Day(), hm[0], hm[1], 0, 0, now.Location())
+		if !t.After(now) {
+			t = t.AddDate(0, 0, 1)
+		}
+		if best.IsZero() || t.Before(best) {
+			best = t
+		}
 	}
-	return t
+	return best
 }
 
 // sweepReleases는 남은 대상이 0이 될 때까지 배치를 반복한다. 키 하나가 쿼터를

@@ -16,7 +16,7 @@ interface LogLine {
 // 신보 체크 탭: DB 보유 아티스트의 새 앨범을 배치로 감지해 자동 추가한다
 // (2026-02 API 개편으로 사라진 new-releases의 로스터 기반 대체). 트랙 동기화
 // 탭과 같은 실행 계약 — 남은 아티스트가 0이 되거나, 중지를 누르거나, Apple
-// 오류가 나면 멈춘다. 20시간 주기라 매일 한 번 돌리면 어제 확인분부터 다시 돈다.
+// 오류가 나면 멈춘다. 확인한 지 10분이 지난 아티스트는 다시 대상이 된다.
 export function ReleasesTab() {
   const qc = useQueryClient()
   const status = useQuery({ queryKey: ['releases-status'], queryFn: fetchReleasesStatus })
@@ -151,7 +151,7 @@ export function ReleasesTab() {
       </div>
 
       {s && s.stale === 0 && !running && log.length === 0 && (
-        <p className={styles.state}>이번 주기의 모든 아티스트를 확인했습니다. 20시간 후 다시 대상이 됩니다.</p>
+        <p className={styles.state}>이번 주기의 모든 아티스트를 확인했습니다. 10분 후 다시 대상이 됩니다.</p>
       )}
 
       {log.length > 0 && (

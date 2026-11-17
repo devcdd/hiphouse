@@ -1,7 +1,7 @@
 import { apiGet, apiPost } from '@/shared/api/client'
 
 // 신보 체크 현황. artists = 신보 감시 대상 아티스트 수,
-// stale = 이번 주기(20시간) 내 아직 확인하지 않은 아티스트 수,
+// stale = 이번 주기(10분) 내 아직 확인하지 않은 아티스트 수,
 // unlinked = 그중 apple_id가 없는 아티스트 수 (체크 때 이름 검색으로 연결을 시도).
 export interface ReleasesStatus {
   artists: number
