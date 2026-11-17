@@ -687,9 +687,10 @@ func (s *server) adminSpotifyCrawlAlbum(w http.ResponseWriter, r *http.Request) 
 // 마이그레이션이 대표 크레딧 앨범 수로 시드하고, 이후는 아티스트 상세 토글이 관리.
 const releaseEligibleSQL = `FROM artists a WHERE a.releases_watch`
 
-// 24시간보다 짧게 잡아서 매일 06:05 스윕 때 전날 체크한 아티스트도 다시 대상이 된다.
+// 한 스윕 안에서 같은 아티스트를 다시 집지 않게 막는 용도라 스윕 소요(3분 안팎)보다만 길면 된다.
+// 하루 두 번 도는 스윕이 매번 전원을 다시 보려면 스윕 간격보다 짧아야 한다.
 const releaseStaleSQL = releaseEligibleSQL +
-	` AND (a.releases_checked_at IS NULL OR a.releases_checked_at < now() - interval '20 hours')`
+	` AND (a.releases_checked_at IS NULL OR a.releases_checked_at < now() - interval '10 minutes')`
 
 // GET /admin/spotify/releases-status — 신보 체크 현황 (대상/이번 주기 대기/Apple 미연결).
 // 경로는 Spotify 시절 그대로지만 대상 SQL은 소스 무관이라 Apple 신보 체크도 같이 쓴다.
