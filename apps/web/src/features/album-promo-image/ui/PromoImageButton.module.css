@@ -1,0 +1,117 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: color-mix(in srgb, #0d0d0d 60%, transparent);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    color 0.15s ease;
+}
+
+.btn:hover:not(:disabled) {
+  color: #ff7a1a;
+  transform: scale(1.1);
+}
+
+.btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.dialog {
+  margin: auto;
+  padding: 0;
+  border: none;
+  border-radius: 20px;
+  background: var(--bg);
+  color: var(--fg);
+  width: min(92vw, 880px);
+}
+
+.dialog::backdrop {
+  background: rgb(0 0 0 / 55%);
+  backdrop-filter: blur(2px);
+}
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 20px 20px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  margin: 0;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.close {
+  display: inline-flex;
+  padding: 4px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+/* 여러 장이면 가로로 넘겨 보며 인스타그램 캐러셀 순서 그대로 확인한다. */
+.strip {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 4px;
+}
+
+.preview {
+  flex: 0 0 auto;
+  height: min(60vh, 520px);
+  aspect-ratio: 4 / 5;
+  border-radius: 8px;
+  background: var(--surface);
+  scroll-snap-align: start;
+}
+
+.download {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 46px;
+  border: none;
+  border-radius: 12px;
+  background: var(--fg);
+  color: var(--bg);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.download:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
