@@ -146,7 +146,7 @@
   text-overflow: ellipsis;
 }
 
-/* 목록 주인이 준 평점. 평가 목록에서만 나오고, 날짜와 평균 별점 바로 위에 둬서 별점순으로 훑어보기 쉽게 한다. */
+/* 목록 주인이 준 평점. 날짜와 평균 별점 바로 아래에 둬서 평균과 견줘 보기 쉽게 한다. */
 .given {
   align-self: flex-start;
   display: flex;
