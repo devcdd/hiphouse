@@ -5,6 +5,7 @@ export { useAlbum } from './api/useAlbum'
 export { useAlbumTracks } from './api/useAlbumTracks'
 export {
   fetchAlbums,
+  fetchAlbumTracks,
   fetchYears,
   updateAlbumArtists,
   updateAlbumDisplayName,

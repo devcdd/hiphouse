@@ -4,6 +4,19 @@
   gap: 12px;
 }
 
+.artWrap {
+  position: relative;
+}
+
+.artAction {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: flex;
+  gap: 6px;
+}
+
 .art {
   display: block;
   position: relative;

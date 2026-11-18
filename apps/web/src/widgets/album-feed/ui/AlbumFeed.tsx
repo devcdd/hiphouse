@@ -3,6 +3,7 @@ import { AlbumCard, AlbumCardSkeleton, useAlbumFeed } from '@/entities/album'
 import type { AlbumQuery } from '@/entities/album'
 import { useAuth } from '@/entities/session'
 import { useMyGiven } from '@/features/rate-album'
+import { CopyAnnouncementButton, PromoImageButton } from '@/features/album-promo-image'
 import { useInfiniteScroll } from '@/shared/lib/useInfiniteScroll'
 import styles from './AlbumFeed.module.css'
 
@@ -12,7 +13,7 @@ export function AlbumFeed({ params }: { params: AlbumQuery }) {
   const { data, fetchNextPage, hasNextPage, isFetching, isLoading, isFetchingNextPage, error } =
     useAlbumFeed(params)
   const albums = useMemo(() => data?.pages.flat() ?? [], [data])
-  const { isAuthed } = useAuth()
+  const { isAuthed, isAdmin } = useAuth()
   const myGiven = useMyGiven(isAuthed)
   const sentinel = useInfiniteScroll<HTMLDivElement>(fetchNextPage, hasNextPage && !isFetching)
 
@@ -22,7 +23,18 @@ export function AlbumFeed({ params }: { params: AlbumQuery }) {
       <div className={styles.grid}>
         {albums.map((a) => (
           <div key={a.id} className={a.deleted_at ? `${styles.item} ${styles.dimmed}` : styles.item}>
-            <AlbumCard album={a} given={myGiven(a.id)} />
+            <AlbumCard
+              album={a}
+              given={myGiven(a.id)}
+              artAction={
+                isAdmin ? (
+                  <>
+                    <CopyAnnouncementButton album={a} />
+                    <PromoImageButton album={a} />
+                  </>
+                ) : undefined
+              }
+            />
           </div>
         ))}
         {isLoading &&

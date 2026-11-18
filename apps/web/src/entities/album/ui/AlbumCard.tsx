@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Star } from 'lucide-react'
 import type { Album } from '@/entities/album/model/types'
@@ -10,9 +10,11 @@ interface Props {
   album: Album
   // 이 목록의 주인이 준 평점(하프스타 1..10). 평가 목록에서만 넘긴다. label은 "내가 준 평점" 같은 읽기용 문구.
   given?: { score: number; label: string }
+  // 앨범아트 우측 상단에 얹을 버튼. 링크 안에 버튼을 넣을 수 없어서 아트 위에 따로 겹쳐 그린다.
+  artAction?: ReactNode
 }
 
-export function AlbumCard({ album, given }: Props) {
+export function AlbumCard({ album, given, artAction }: Props) {
   const albumHref = `/albums/${encodeURIComponent(album.id)}`
   const title = displayName(album)
   // Each credited artist carries its own Spotify id, so every name links to that artist.
@@ -20,13 +22,16 @@ export function AlbumCard({ album, given }: Props) {
 
   return (
     <article className={styles.card}>
-      <Link to={albumHref} className={styles.art} aria-label={title}>
-        {album.image_url ? (
-          <img src={album.image_url} alt={title} loading="lazy" />
-        ) : (
-          <div className={styles.placeholder}>{title.slice(0, 1)}</div>
-        )}
-      </Link>
+      <div className={styles.artWrap}>
+        <Link to={albumHref} className={styles.art} aria-label={title}>
+          {album.image_url ? (
+            <img src={album.image_url} alt={title} loading="lazy" />
+          ) : (
+            <div className={styles.placeholder}>{title.slice(0, 1)}</div>
+          )}
+        </Link>
+        {artAction && <div className={styles.artAction}>{artAction}</div>}
+      </div>
       <div className={styles.meta}>
         <div className={styles.titleRow}>
           <Link to={albumHref} className={styles.name} title={title}>
