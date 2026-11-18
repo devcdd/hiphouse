@@ -1,0 +1,204 @@
+/* 바와 카드 줄을 한 패널로 묶어 아래 피드와 떨어져 보이게 한다. */
+.section {
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.thumbs {
+  display: flex;
+}
+
+/* 아트를 겹쳐 쌓아 접힌 상태에서도 오늘 어떤 앨범이 있는지 엿보이게 한다. */
+.thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: cover;
+  outline: 2px solid var(--surface);
+}
+
+.thumb + .thumb {
+  margin-left: -10px;
+}
+
+.barTitle {
+  font-size: 0.92rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.barCount {
+  color: var(--muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+/* 좁은 화면에서 날짜까지 붙이면 제목이 두 줄로 꺾여서 장수만 남긴다. */
+@media (max-width: 600px) {
+  .barDate {
+    display: none;
+  }
+}
+
+.barIcon {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--muted);
+  transition: transform 0.25s ease;
+}
+
+.section:not([data-collapsed='true']) .barIcon {
+  transform: rotate(180deg);
+}
+
+/* 높이를 모르는 내용을 접고 펴려고 grid 행을 0fr과 1fr 사이로 옮긴다. */
+.collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows 0.3s ease,
+    opacity 0.2s ease;
+}
+
+.section[data-collapsed='true'] .collapse {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
+.collapseInner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .collapse,
+  .barIcon {
+    transition: none;
+  }
+}
+
+.divider {
+  margin: 6px 14px 0;
+  border: none;
+  border-top: 1px solid color-mix(in srgb, var(--fg) 8%, transparent);
+}
+
+.trackWrap {
+  position: relative;
+  padding: 12px 14px 14px;
+  /* 카드 뱃지와 아트 자리표시가 --surface를 쓰는데 패널 배경과 같아 묻히므로 안쪽에서만 페이지 배경색으로 바꾼다. */
+  --surface: var(--bg);
+}
+
+
+/* 아트 가운데 높이(꼬리표 29px + 아트 160px의 절반)에 화살표를 띄운다. */
+.navBtn {
+  position: absolute;
+  /* trackWrap 위 여백 12px을 더한다. */
+  top: 105px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--fg);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 15%);
+  cursor: pointer;
+}
+
+.prev {
+  left: 2px;
+}
+
+.next {
+  right: 2px;
+}
+
+/* 터치 기기는 손가락으로 넘기므로 화살표를 숨긴다. */
+@media (pointer: coarse) {
+  .navBtn {
+    display: none;
+  }
+}
+
+.track {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  /* 가로 스크롤 영역은 넘친 부분을 잘라서 포커스 테두리가 보이도록 아래에 여유를 둔다. */
+  padding-bottom: 4px;
+}
+
+.track::-webkit-scrollbar {
+  display: none;
+}
+
+.item {
+  /* min-width를 풀지 않으면 긴 제목이나 큰 아트의 원래 폭만큼 카드가 늘어난다. */
+  flex: 0 0 160px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scroll-snap-align: start;
+}
+
+.tag {
+  align-self: flex-start;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+
+.tagSkeleton {
+  width: 64px;
+  height: 21px;
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+/* 좁은 화면에서는 세 번째 카드가 살짝 보이게 해서 옆으로 넘길 수 있다는 걸 알린다. */
+@media (max-width: 600px) {
+  .track {
+    gap: 14px;
+  }
+
+  .trackWrap {
+    padding: 6px 10px 10px;
+  }
+
+  .item {
+    flex-basis: 136px;
+  }
+}
+

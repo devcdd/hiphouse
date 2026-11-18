@@ -117,6 +117,7 @@ func main() {
 	// Albums — reads public, writes admin-only
 	mux.HandleFunc("GET /albums", s.listAlbums)
 	mux.HandleFunc("GET /albums/years", s.listYears)
+	mux.HandleFunc("GET /albums/on-this-day", s.listOnThisDay)
 	mux.HandleFunc("POST /albums", s.requireAdmin(s.createAlbum))
 	mux.HandleFunc("GET /albums/{id}", s.getAlbum)
 	// 일반 사용자에겐 Spotify 임베드만 노출한다 — 우리 DB 트랙 목록은 관리자 편집용.

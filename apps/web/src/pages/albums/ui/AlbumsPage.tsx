@@ -14,6 +14,7 @@ import {
   DEFAULT_FILTER_QUERY,
 } from '@/features/album-filters'
 import { AlbumFeed } from '@/widgets/album-feed'
+import { OnThisDay } from '@/widgets/on-this-day'
 import styles from './AlbumsPage.module.css'
 
 // Filter state lives in the URL so it survives navigating to a detail page and back.
@@ -58,6 +59,7 @@ export function AlbumsPage() {
 
   return (
     <div className={styles.page}>
+      <OnThisDay />
       <div className={styles.controls}>
         <YearFilter
           years={years}

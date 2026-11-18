@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Download, Flame, LoaderCircle, X } from 'lucide-react'
 import { fetchAlbumTracks, type Album } from '@/entities/album'
-import { promoFileName, renderPromoImages } from '../lib/renderPromoImage'
+import { promoFileName, renderPromoImages, type PromoOptions } from '../lib/renderPromoImage'
 import styles from './PromoImageButton.module.css'
 
 // 휴대폰에선 공유 시트로 여러 장을 한 번에 넘겨 인스타그램 캐러셀로 바로 올리고, 데스크톱에선 파일로 내려받는다.
@@ -32,7 +32,7 @@ interface Preview {
   url: string
 }
 
-export function PromoImageButton({ album }: { album: Album }) {
+export function PromoImageButton({ album, options }: { album: Album; options?: PromoOptions }) {
   const [busy, setBusy] = useState(false)
   const [saving, setSaving] = useState(false)
   const [previews, setPreviews] = useState<Preview[] | null>(null)
@@ -51,10 +51,10 @@ export function PromoImageButton({ album }: { album: Album }) {
     setBusy(true)
     try {
       const tracks = await fetchAlbumTracks(album.id)
-      const blobs = await renderPromoImages(album, tracks)
+      const blobs = await renderPromoImages(album, tracks, options)
       setPreviews(
         blobs.map((b, i) => {
-          const file = new File([b], promoFileName(album, i), { type: 'image/png' })
+          const file = new File([b], promoFileName(album, i, options), { type: 'image/png' })
           return { file, url: URL.createObjectURL(file) }
         }),
       )
