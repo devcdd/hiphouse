@@ -44,17 +44,6 @@ export function AlbumCard({ album, given }: Props) {
             </Fragment>
           ))}
         </div>
-        {given && (
-          <span className={styles.given} role="img" aria-label={`${given.label} ${(given.score / 2).toFixed(1)}`}>
-            <span className={styles.givenLabel} aria-hidden>
-              {given.label}
-            </span>
-            <span className={styles.givenScore} aria-hidden>
-              <Star size={12} strokeWidth={2.2} fill="currentColor" />
-              {(given.score / 2).toFixed(1)}
-            </span>
-          </span>
-        )}
         <div className={styles.footer}>
           {(album.release_date ?? album.year) != null && (
             <span className={styles.year}>{album.release_date ?? album.year}</span>
@@ -69,6 +58,17 @@ export function AlbumCard({ album, given }: Props) {
             </span>
           )}
         </div>
+        {given && (
+          <span className={styles.given} role="img" aria-label={`${given.label} ${(given.score / 2).toFixed(1)}`}>
+            <span className={styles.givenLabel} aria-hidden>
+              {given.label}
+            </span>
+            <span className={styles.givenScore} aria-hidden>
+              <Star size={12} strokeWidth={2.2} fill="currentColor" />
+              {(given.score / 2).toFixed(1)}
+            </span>
+          </span>
+        )}
         {album.awards.length > 0 && (
           <div className={styles.awards}>
             {album.awards.map((a) => (
