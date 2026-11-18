@@ -3,9 +3,11 @@ export type { AlbumQuery, AlbumInfoPatch } from './api/albumApi'
 export { useAlbumFeed } from './api/useAlbumFeed'
 export { useAlbum } from './api/useAlbum'
 export { useAlbumTracks } from './api/useAlbumTracks'
+export { useOnThisDay } from './api/useOnThisDay'
 export {
   fetchAlbums,
   fetchAlbumTracks,
+  fetchOnThisDay,
   fetchYears,
   updateAlbumArtists,
   updateAlbumDisplayName,

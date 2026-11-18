@@ -71,3 +71,8 @@ export function updateTrackDisplayName(albumId: string, trackId: string, display
 export function fetchYears(): Promise<number[]> {
   return apiGet<number[]>('/albums/years')
 }
+
+// date(YYYY-MM-DD)와 같은 월·일에 나온 지난해 앨범. 평가 많은 순으로 최대 30장.
+export function fetchOnThisDay(date: string): Promise<Album[]> {
+  return apiGet<Album[]>('/albums/on-this-day', { date })
+}

@@ -234,8 +234,7 @@ const FOIL_STOPS: [at: number, color: string][] = [
 
 // 커버 오른쪽 아래 모서리에 걸쳐 붙인 신보 라벨. 커버 색에 따라 달라지면 게시물마다 다른 물건처럼 보여서
 // 검정 바탕에 금박으로 고정해 힙집 표식으로 쓴다. right는 기울이기 전 라벨의 오른쪽 끝이다.
-function drawSticker(ctx: CanvasRenderingContext2D, right: number, cy: number, sub: string) {
-  const label = 'NEW RELEASE'
+function drawSticker(ctx: CanvasRenderingContext2D, right: number, cy: number, label: string, sub: string) {
   const size = 52
   const tracking = 0.05
   ctx.save()
@@ -312,11 +311,28 @@ function newCanvas(): [HTMLCanvasElement, CanvasRenderingContext2D] {
 }
 
 // 커버를 위쪽 가운데에 두고, 아래 띠에는 메타 줄부터 아티스트, 제목 순으로 밑에서부터 쌓아 글자를 하단에 붙인다.
-function drawCover(ctx: CanvasRenderingContext2D, album: Album, tracks: Track[], art: ImageBitmap, pal: Palette) {
+function ordinal(n: number): string {
+  const tail = n % 100 >= 11 && n % 100 <= 13 ? 'TH' : (['TH', 'ST', 'ND', 'RD'][n % 10] ?? 'TH')
+  return `${n}${tail}`
+}
+
+function drawCover(
+  ctx: CanvasRenderingContext2D,
+  album: Album,
+  tracks: Track[],
+  art: ImageBitmap,
+  pal: Palette,
+  opts: PromoOptions,
+) {
   ctx.fillStyle = pal.bg
   ctx.fillRect(0, 0, W, H)
   ctx.drawImage(art, PAD, TOP, COVER, COVER)
-  drawSticker(ctx, PAD + COVER + 10, TOP + COVER - 40, album.release_date?.replaceAll('-', '.') ?? 'OUT NOW')
+  const date = album.release_date?.replaceAll('-', '.')
+  if (opts.anniversaryYears) {
+    drawSticker(ctx, PAD + COVER + 10, TOP + COVER - 40, `${ordinal(opts.anniversaryYears)} ANNIVERSARY`, `RELEASED ${date ?? ''}`)
+  } else {
+    drawSticker(ctx, PAD + COVER + 10, TOP + COVER - 40, 'NEW RELEASE', date ?? 'OUT NOW')
+  }
 
   drawLogo(ctx, pal.fg)
 
@@ -477,13 +493,18 @@ function toBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 }
 
 /** 첫 장은 커버, 둘째 장부터 트랙리스트. 트랙이 하나 이하면 커버 한 장만 만든다. */
-export async function renderPromoImages(album: Album, tracks: Track[]): Promise<Blob[]> {
+export interface PromoOptions {
+  // 발매 기념일 포스터면 몇 주년인지. 없으면 신보 포스터로 그린다.
+  anniversaryYears?: number
+}
+
+export async function renderPromoImages(album: Album, tracks: Track[], opts: PromoOptions = {}): Promise<Blob[]> {
   if (!album.image_url) throw new Error('앨범아트가 없습니다')
   const [art] = await Promise.all([loadArt(album.image_url), loadFonts()])
   try {
     const [cover, coverCtx] = newCanvas()
     const color = pickColor(art)
-    drawCover(coverCtx, album, tracks, art, paletteOf(color))
+    drawCover(coverCtx, album, tracks, art, paletteOf(color), opts)
     const listPal = paletteOf(shiftTone(color))
     const out = [toBlob(cover)]
     if (tracks.length > 1) {
@@ -501,8 +522,9 @@ export async function renderPromoImages(album: Album, tracks: Track[]): Promise<
   }
 }
 
-export function promoFileName(album: Album, index: number): string {
+export function promoFileName(album: Album, index: number, opts: PromoOptions = {}): string {
   const artist = album.artists[0] ? displayName(album.artists[0]) : ''
   const base = [artist, displayName(album)].filter(Boolean).join(' - ')
-  return `hiphouse ${base} ${index + 1}`.replace(/[\\/:*?"<>|]/g, '_') + '.png'
+  const kind = opts.anniversaryYears ? ` ${opts.anniversaryYears}주년` : ''
+  return `hiphouse${kind} ${base} ${index + 1}`.replace(/[\\/:*?"<>|]/g, '_') + '.png'
 }
