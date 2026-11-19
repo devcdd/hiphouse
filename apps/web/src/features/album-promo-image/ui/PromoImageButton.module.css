@@ -78,6 +78,39 @@
   cursor: pointer;
 }
 
+/* 고른 색에는 테두리와 바깥 고리를 둘러 패널 배경과 비슷한 색이어도 구분되게 한다. */
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.swatch {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--fg) 16%, transparent);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.swatch[aria-checked='true'] {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+
+.auto {
+  width: auto;
+  padding: 0 12px;
+  border-radius: 15px;
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 /* 여러 장이면 가로로 넘겨 보며 인스타그램 캐러셀 순서 그대로 확인한다. */
 .strip {
   display: flex;
@@ -85,6 +118,11 @@
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   padding-bottom: 4px;
+  transition: opacity 0.15s ease;
+}
+
+.strip[data-rendering='true'] {
+  opacity: 0.5;
 }
 
 .preview {

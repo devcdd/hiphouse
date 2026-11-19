@@ -1,6 +1,7 @@
 import type { Album, Track } from '@/entities/album'
 import { displayName } from '@/shared/lib/displayName'
 import { albumStats } from './albumStats'
+import { drawShrinkWrap, seedOf } from './shrinkWrap'
 
 // 인스타그램 피드 세로형(4:5).
 const W = 1080
@@ -63,7 +64,21 @@ async function loadArt(url: string): Promise<ImageBitmap> {
   return createImageBitmap(await res.blob())
 }
 
-type RGB = [number, number, number]
+export type RGB = [number, number, number]
+
+// 커버에서 뽑은 색이 탁하거나 시리즈 톤을 맞추고 싶을 때 고르는 배경색. 트랙리스트 장은 여기서 톤만 옮긴다.
+export const PROMO_BACKGROUNDS: { id: string; name: string; rgb: RGB }[] = [
+  { id: 'ink', name: '먹색', rgb: [20, 20, 20] },
+  { id: 'paper', name: '종이', rgb: [236, 232, 223] },
+  { id: 'concrete', name: '콘크리트', rgb: [150, 150, 146] },
+  { id: 'burgundy', name: '버건디', rgb: [94, 22, 34] },
+  { id: 'red', name: '레드', rgb: [178, 44, 34] },
+  { id: 'orange', name: '오렌지', rgb: [232, 106, 28] },
+  { id: 'mustard', name: '머스터드', rgb: [214, 170, 52] },
+  { id: 'olive', name: '올리브', rgb: [92, 98, 52] },
+  { id: 'forest', name: '포레스트', rgb: [24, 64, 48] },
+  { id: 'navy', name: '네이비', rgb: [22, 34, 72] },
+]
 
 interface Palette {
   bg: string
@@ -189,40 +204,20 @@ function layoutTitle(ctx: CanvasRenderingContext2D, text: string, maxW: number) 
   return { size: 52, lines: wrap(ctx, text, maxW).slice(0, 2) }
 }
 
-// 카탈로그 번호 도장. 매 카드 같은 자리에 찍어 힙집 카드의 표식으로 쓴다.
-function drawStamp(ctx: CanvasRenderingContext2D, text: string, right: number, cy: number, color: string) {
-  ctx.save()
-  ctx.font = `500 20px ${MONO}`
-  ctx.letterSpacing = '0.14em'
-  const w = ctx.measureText(text).width + 34
-  const h = 46
-  ctx.translate(right - w / 2, cy)
-  ctx.rotate(-0.045)
-  ctx.strokeStyle = color
-  ctx.lineWidth = 2.5
-  ctx.strokeRect(-w / 2, -h / 2, w, h)
-  ctx.lineWidth = 1
-  ctx.strokeRect(-w / 2 + 5, -h / 2 + 5, w - 10, h - 10)
-  ctx.fillStyle = color
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(text, 3, 1)
-  ctx.restore()
-}
-
 function drawLogo(ctx: CanvasRenderingContext2D, color: string) {
+  const size = 32
   ctx.save()
   ctx.fillStyle = color
-  ctx.font = display(46)
+  ctx.font = display(size)
   ctx.letterSpacing = '0.12em'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   // 자간이 마지막 글자 뒤에도 붙어 오른쪽으로 밀리니, 그 절반만큼 오른쪽에서 그려 가운데를 맞춘다.
-  ctx.fillText('HIPHOUSE', W / 2 + 46 * 0.06, TOP / 2 + 2)
+  ctx.fillText('HIPHOUSE', W / 2 + size * 0.06, TOP / 2 + 2)
   ctx.restore()
 }
 
-// 검정 라벨에 샴페인 골드 박을 찍은 느낌을 내려고 밝은 띠와 어두운 띠를 비스듬히 번갈아 둔다.
+// 검정 스티커에 샴페인 골드 박을 찍은 느낌을 내려고 밝은 띠와 어두운 띠를 비스듬히 번갈아 둔다.
 const FOIL_STOPS: [at: number, color: string][] = [
   [0, '#dcc289'],
   [0.24, '#b9945b'],
@@ -232,62 +227,100 @@ const FOIL_STOPS: [at: number, color: string][] = [
   [1, '#dfc790'],
 ]
 
-// 커버 오른쪽 아래 모서리에 걸쳐 붙인 신보 라벨. 커버 색에 따라 달라지면 게시물마다 다른 물건처럼 보여서
-// 검정 바탕에 금박으로 고정해 힙집 표식으로 쓴다. right는 기울이기 전 라벨의 오른쪽 끝이다.
-function drawSticker(ctx: CanvasRenderingContext2D, right: number, cy: number, label: string, sub: string) {
-  const size = 52
+// 필름 위에 손으로 붙인 신보 스티커. 커버 색에 따라 달라지면 게시물마다 다른 물건처럼 보여서
+// 검정 바탕에 금박으로 고정해 힙집 표식으로 쓴다. 기울인 뒤에도 커버 오른쪽 아래 모서리에서 margin만큼 안쪽에 놓인다.
+function drawSticker(ctx: CanvasRenderingContext2D, label: string, sub: string) {
+  const size = 58
   const tracking = 0.05
+  const tilt = -0.07
+  const margin = 24
   ctx.save()
   ctx.font = display(size)
   ctx.letterSpacing = `${tracking}em`
-  // 자간은 마지막 글자 뒤에도 붙으니 그만큼 빼야 글자가 라벨 가운데에 온다.
+  // 자간은 마지막 글자 뒤에도 붙으니 그만큼 빼야 글자가 스티커 가운데에 온다.
   const textW = ctx.measureText(label).width - size * tracking
-  const w = textW + 68
-  const h = 124
-  ctx.translate(right - w / 2, cy)
-  ctx.rotate(-0.045)
+  const capH = ctx.measureText('H').actualBoundingBoxAscent
+  const w = textW + 76
+  const h = 138
+  const radius = 12
+  // 기념일 문구처럼 긴 글자는 스티커가 커버 절반을 넘지 않게 통째로 줄인다.
+  const scale = Math.min(1, (COVER * 0.47) / w)
+  const [sin, cos] = [Math.abs(Math.sin(tilt)), Math.cos(tilt)]
+  ctx.translate(
+    PAD + COVER - margin - ((w * cos + h * sin) * scale) / 2,
+    TOP + COVER - margin - ((w * sin + h * cos) * scale) / 2,
+  )
+  ctx.rotate(tilt)
+  ctx.scale(scale, scale)
 
-  ctx.shadowColor = 'rgba(0,0,0,0.36)'
-  ctx.shadowBlur = 16
-  ctx.shadowOffsetY = 6
   const body = ctx.createLinearGradient(0, -h / 2, 0, h / 2)
-  body.addColorStop(0, '#1b1b1c')
+  body.addColorStop(0, '#1d1d1e')
   body.addColorStop(1, '#0a0a0b')
   ctx.fillStyle = body
+  // 스티커는 필름에 붙어 있어서 그림자가 짧다. 넓은 그림자는 옅게만 깔아 윤곽을 살린다.
+  ctx.shadowColor = 'rgba(0,0,0,0.3)'
+  ctx.shadowBlur = 18
+  ctx.shadowOffsetY = 7
   ctx.beginPath()
-  ctx.roundRect(-w / 2, -h / 2, w, h, 3)
+  ctx.roundRect(-w / 2, -h / 2, w, h, radius)
+  ctx.fill()
+  ctx.shadowColor = 'rgba(0,0,0,0.5)'
+  ctx.shadowBlur = 4
+  ctx.shadowOffsetY = 1.5
   ctx.fill()
   ctx.shadowColor = 'transparent'
 
-  const foil = ctx.createLinearGradient(-w / 2, -h, w / 2, h)
-  for (const [at, color] of FOIL_STOPS) foil.addColorStop(at, color)
-  // 검정 커버 위에서는 라벨 바탕이 묻히므로 안쪽 금박 테두리가 라벨 윤곽 노릇을 한다.
-  ctx.strokeStyle = foil
-  ctx.lineWidth = 1.25
+  // 코팅된 스티커 면에 비친 빛. 필름과 같은 방향으로 기울여 한 조명 아래 있는 것처럼 맞춘다.
+  ctx.save()
+  ctx.clip()
+  const gloss = ctx.createLinearGradient(-w * 0.42, -h / 2, -w * 0.12, h / 2)
+  gloss.addColorStop(0, 'rgba(255,255,255,0)')
+  gloss.addColorStop(0.42, 'rgba(255,255,255,0.075)')
+  gloss.addColorStop(0.5, 'rgba(255,255,255,0.075)')
+  gloss.addColorStop(0.52, 'rgba(255,255,255,0)')
+  ctx.fillStyle = gloss
+  ctx.fillRect(-w / 2, -h / 2, w, h)
+  ctx.restore()
+
+  // 잘라 낸 단면이 빛을 받아 종이 두께가 보인다. 어두운 커버에서는 이 선이 스티커 윤곽이 된다.
+  const rim = ctx.createLinearGradient(0, -h / 2, 0, h / 2)
+  rim.addColorStop(0, 'rgba(255,255,255,0.36)')
+  rim.addColorStop(0.3, 'rgba(255,255,255,0.12)')
+  rim.addColorStop(1, 'rgba(255,255,255,0.06)')
+  ctx.strokeStyle = rim
+  ctx.lineWidth = 1
   ctx.beginPath()
-  ctx.roundRect(-w / 2 + 7, -h / 2 + 7, w - 14, h - 14, 1)
+  ctx.roundRect(-w / 2 + 0.5, -h / 2 + 0.5, w - 1, h - 1, radius - 0.5)
   ctx.stroke()
 
+  const foil = ctx.createLinearGradient(-w / 2, -h, w / 2, h)
+  for (const [at, color] of FOIL_STOPS) foil.addColorStop(at, color)
+  // 검정 커버 위에서는 스티커 바탕이 묻히므로 안쪽 금박 테두리가 윤곽 노릇을 한다.
+  ctx.strokeStyle = foil
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  ctx.roundRect(-w / 2 + 8, -h / 2 + 8, w - 16, h - 16, radius - 5)
+  ctx.stroke()
+
+  // 큰 글자와 날짜 줄을 한 덩어리로 보고 스티커 세로 가운데에 맞춘다.
+  const gap = 24
+  const subH = 10
+  const baseline = -(capH + gap + subH) / 2 + capH
   ctx.fillStyle = foil
   ctx.textAlign = 'left'
   ctx.textBaseline = 'alphabetic'
-  ctx.fillText(label, -textW / 2, 8)
+  ctx.fillText(label, -textW / 2, baseline)
 
-  ctx.font = `500 13px ${MONO}`
+  ctx.font = `500 15px ${MONO}`
   ctx.letterSpacing = '0.2em'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
+  const subY = baseline + gap + subH / 2
   const subW = ctx.measureText(sub).width
-  ctx.fillText(sub, 13 * 0.1, 34)
-  ctx.fillRect(-subW / 2 - 40, 33.5, 28, 1)
-  ctx.fillRect(subW / 2 + 12, 33.5, 28, 1)
+  ctx.fillText(sub, 15 * 0.1, subY)
+  ctx.fillRect(-subW / 2 - 42, subY - 0.5, 28, 1)
+  ctx.fillRect(subW / 2 + 14, subY - 0.5, 28, 1)
   ctx.restore()
-}
-
-function catalogNo(album: Album): string {
-  const d = album.release_date
-  if (d && d.length === 10) return `HH-${d.slice(2, 4)}${d.slice(5, 7)}${d.slice(8, 10)}`
-  return `HH-${album.year ?? '0000'}`
 }
 
 const TYPE_EN: Record<string, string> = { 정규: 'ALBUM', EP: 'EP', 싱글: 'SINGLE', 컴필레이션: 'COMPILATION' }
@@ -310,12 +343,34 @@ function newCanvas(): [HTMLCanvasElement, CanvasRenderingContext2D] {
   return [canvas, ctx]
 }
 
-// 커버를 위쪽 가운데에 두고, 아래 띠에는 메타 줄부터 아티스트, 제목 순으로 밑에서부터 쌓아 글자를 하단에 붙인다.
+// 커버를 바닥에 놓인 밀봉 LP처럼 그린다. 그림자로 띄우고 아트 위에 수축 필름을 씌운다.
+function drawJacket(ctx: CanvasRenderingContext2D, art: ImageBitmap, seed: number) {
+  ctx.save()
+  ctx.beginPath()
+  ctx.roundRect(PAD, TOP, COVER, COVER, 3)
+  ctx.fillStyle = '#000'
+  ctx.shadowColor = 'rgba(0,0,0,0.3)'
+  ctx.shadowBlur = 44
+  ctx.shadowOffsetY = 22
+  ctx.fill()
+  // 넓은 그림자만 있으면 재킷이 떠 보여서 바닥에 닿는 짙은 그림자를 한 겹 더 둔다.
+  ctx.shadowColor = 'rgba(0,0,0,0.32)'
+  ctx.shadowBlur = 9
+  ctx.shadowOffsetY = 3
+  ctx.fill()
+  ctx.shadowColor = 'transparent'
+  ctx.clip()
+  ctx.drawImage(art, PAD, TOP, COVER, COVER)
+  drawShrinkWrap(ctx, PAD, TOP, COVER, seed)
+  ctx.restore()
+}
+
 function ordinal(n: number): string {
   const tail = n % 100 >= 11 && n % 100 <= 13 ? 'TH' : (['TH', 'ST', 'ND', 'RD'][n % 10] ?? 'TH')
   return `${n}${tail}`
 }
 
+// 커버를 위쪽 가운데에 두고, 아래 띠에는 메타 줄부터 아티스트, 제목 순으로 밑에서부터 쌓아 글자를 하단에 붙인다.
 function drawCover(
   ctx: CanvasRenderingContext2D,
   album: Album,
@@ -326,25 +381,23 @@ function drawCover(
 ) {
   ctx.fillStyle = pal.bg
   ctx.fillRect(0, 0, W, H)
-  ctx.drawImage(art, PAD, TOP, COVER, COVER)
+  drawJacket(ctx, art, seedOf(album.id))
   const date = album.release_date?.replaceAll('-', '.')
   if (opts.anniversaryYears) {
-    drawSticker(ctx, PAD + COVER + 10, TOP + COVER - 40, `${ordinal(opts.anniversaryYears)} ANNIVERSARY`, `RELEASED ${date ?? ''}`)
+    drawSticker(ctx, `${ordinal(opts.anniversaryYears)} ANNIVERSARY`, `RELEASED ${date ?? ''}`)
   } else {
-    drawSticker(ctx, PAD + COVER + 10, TOP + COVER - 40, 'NEW RELEASE', date ?? 'OUT NOW')
+    drawSticker(ctx, 'NEW RELEASE', date ?? 'OUT NOW')
   }
 
   drawLogo(ctx, pal.fg)
 
   const left = PAD
-  const right = PAD + COVER
   const maxW = COVER
   const metaY = BOTTOM_Y
 
   ctx.textBaseline = 'middle'
   ctx.fillStyle = pal.sub
   monoLabel(ctx, metaLine(album, tracks), left, metaY)
-  drawStamp(ctx, catalogNo(album), right, metaY, pal.fg)
 
   // 아티스트는 제목 위에 작은 라벨로 두고, 제목은 메타 줄 바로 위에서부터 위로 쌓는다.
   ctx.fillStyle = pal.fg
@@ -458,9 +511,9 @@ function drawTracklist(
   })
 
   ctx.fillStyle = fg
-  ctx.textAlign = 'left'
-  monoLabel(ctx, 'HIPHOUSE.KR', PAD, BOTTOM_Y)
-  drawStamp(ctx, catalogNo(album), W - PAD, BOTTOM_Y, fg)
+  ctx.textAlign = 'right'
+  // 자간이 마지막 글자 뒤에도 붙어서 그만큼 밀어 재생 시간 열과 오른쪽 끝을 맞춘다.
+  monoLabel(ctx, 'HIPHOUSE.KR', W - PAD + 18 * 0.12, BOTTOM_Y)
 }
 
 // 크레딧 줄이 있는 곡은 높이가 달라 곡 수가 아닌 높이 합으로 나눈다. 넘치는 만큼 장을 늘리되,
@@ -496,6 +549,8 @@ function toBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 export interface PromoOptions {
   // 발매 기념일 포스터면 몇 주년인지. 없으면 신보 포스터로 그린다.
   anniversaryYears?: number
+  // 없으면 커버에서 가장 눈에 띄는 색을 뽑아 쓴다.
+  background?: RGB
 }
 
 export async function renderPromoImages(album: Album, tracks: Track[], opts: PromoOptions = {}): Promise<Blob[]> {
@@ -503,7 +558,7 @@ export async function renderPromoImages(album: Album, tracks: Track[], opts: Pro
   const [art] = await Promise.all([loadArt(album.image_url), loadFonts()])
   try {
     const [cover, coverCtx] = newCanvas()
-    const color = pickColor(art)
+    const color = opts.background ?? pickColor(art)
     drawCover(coverCtx, album, tracks, art, paletteOf(color), opts)
     const listPal = paletteOf(shiftTone(color))
     const out = [toBlob(cover)]
