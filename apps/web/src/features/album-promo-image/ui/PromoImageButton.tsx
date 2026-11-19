@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Download, Flame, LoaderCircle, X } from 'lucide-react'
-import { fetchAlbumTracks, type Album } from '@/entities/album'
-import { promoFileName, renderPromoImages, type PromoOptions } from '../lib/renderPromoImage'
+import { fetchAlbumTracks, type Album, type Track } from '@/entities/album'
+import { PROMO_BACKGROUNDS, promoFileName, renderPromoImages, type PromoOptions } from '../lib/renderPromoImage'
 import styles from './PromoImageButton.module.css'
 
 // 휴대폰에선 공유 시트로 여러 장을 한 번에 넘겨 인스타그램 캐러셀로 바로 올리고, 데스크톱에선 파일로 내려받는다.
@@ -36,7 +36,13 @@ export function PromoImageButton({ album, options }: { album: Album; options?: P
   const [busy, setBusy] = useState(false)
   const [saving, setSaving] = useState(false)
   const [previews, setPreviews] = useState<Preview[] | null>(null)
+  // null이면 커버에서 뽑은 색을 쓴다.
+  const [background, setBackground] = useState<string | null>(null)
+  const [rendering, setRendering] = useState(false)
   const dialog = useRef<HTMLDialogElement>(null)
+  const tracks = useRef<Track[] | null>(null)
+  // 색을 연달아 바꾸면 늦게 끝난 이전 렌더가 화면을 덮어쓰지 않게 마지막 요청만 반영한다.
+  const latest = useRef(0)
 
   useEffect(() => {
     const el = dialog.current
@@ -47,21 +53,43 @@ export function PromoImageButton({ album, options }: { album: Album; options?: P
 
   useEffect(() => () => previews?.forEach((p) => URL.revokeObjectURL(p.url)), [previews])
 
+  const render = async (bgId: string | null) => {
+    const req = ++latest.current
+    tracks.current ??= await fetchAlbumTracks(album.id)
+    const rgb = PROMO_BACKGROUNDS.find((b) => b.id === bgId)?.rgb
+    const blobs = await renderPromoImages(album, tracks.current, { ...options, background: rgb })
+    if (req !== latest.current) return
+    setPreviews(
+      blobs.map((b, i) => {
+        const file = new File([b], promoFileName(album, i, options), { type: 'image/png' })
+        return { file, url: URL.createObjectURL(file) }
+      }),
+    )
+  }
+
+  const fail = (e: unknown) => alert(`홍보 이미지를 만들지 못했습니다: ${e instanceof Error ? e.message : String(e)}`)
+
   const open = async () => {
     setBusy(true)
     try {
-      const tracks = await fetchAlbumTracks(album.id)
-      const blobs = await renderPromoImages(album, tracks, options)
-      setPreviews(
-        blobs.map((b, i) => {
-          const file = new File([b], promoFileName(album, i, options), { type: 'image/png' })
-          return { file, url: URL.createObjectURL(file) }
-        }),
-      )
+      await render(background)
     } catch (e) {
-      alert(`홍보 이미지를 만들지 못했습니다: ${e instanceof Error ? e.message : String(e)}`)
+      fail(e)
     } finally {
       setBusy(false)
+    }
+  }
+
+  const pick = async (bgId: string | null) => {
+    if (bgId === background) return
+    setBackground(bgId)
+    setRendering(true)
+    try {
+      await render(bgId)
+    } catch (e) {
+      fail(e)
+    } finally {
+      setRendering(false)
     }
   }
 
@@ -75,7 +103,11 @@ export function PromoImageButton({ album, options }: { album: Album; options?: P
     }
   }
 
-  const close = () => setPreviews(null)
+  const close = () => {
+    latest.current++
+    setPreviews(null)
+    setRendering(false)
+  }
 
   return (
     <>
@@ -104,12 +136,37 @@ export function PromoImageButton({ album, options }: { album: Album; options?: P
                 <X size={18} strokeWidth={2.4} />
               </button>
             </div>
-            <div className={styles.strip}>
+            <div className={styles.swatches} role="radiogroup" aria-label="배경색">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={background === null}
+                className={`${styles.swatch} ${styles.auto}`}
+                onClick={() => pick(null)}
+              >
+                자동
+              </button>
+              {PROMO_BACKGROUNDS.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={background === b.id}
+                  aria-label={b.name}
+                  title={b.name}
+                  className={styles.swatch}
+                  style={{ background: `rgb(${b.rgb.join(',')})` }}
+                  onClick={() => pick(b.id)}
+                />
+              ))}
+              {rendering && <LoaderCircle size={16} className={styles.spin} />}
+            </div>
+            <div className={styles.strip} data-rendering={rendering}>
               {previews.map((p, i) => (
                 <img key={p.url} src={p.url} alt={`${i + 1}번째 이미지`} className={styles.preview} />
               ))}
             </div>
-            <button type="button" className={styles.download} onClick={save} disabled={saving}>
+            <button type="button" className={styles.download} onClick={save} disabled={saving || rendering}>
               {saving ? <LoaderCircle size={16} className={styles.spin} /> : <Download size={16} strokeWidth={2.4} />}
               다운로드
             </button>
