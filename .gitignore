@@ -13,3 +13,4 @@ dist/
 # Apple MusicKit 비밀키
 *.p8
 secrets/
+.claude/worktrees/
