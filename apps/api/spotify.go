@@ -712,6 +712,8 @@ type releaseCheckItem struct {
 	ID     string   `json:"id"`
 	Name   *string  `json:"name"`
 	Albums []string `json:"albums"` // 이번에 새로 담은 앨범 이름들
+	// 스윕이 끝난 뒤 알림 메일에 넣을 앨범을 다시 조회하는 데 쓴다.
+	AlbumIDs []string `json:"-"`
 }
 
 type releaseCheckResult struct {

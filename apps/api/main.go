@@ -178,6 +178,7 @@ func main() {
 	mux.HandleFunc("GET /admin/apple/albums", s.requireAdmin(s.adminAppleAlbumSearch))
 	mux.HandleFunc("POST /admin/apple/crawl-album", s.requireAdmin(s.adminAppleCrawlAlbum))
 	mux.HandleFunc("POST /admin/apple/check-releases", s.requireAdmin(s.adminAppleCheckReleases))
+	mux.HandleFunc("POST /admin/notify/test", s.requireAdmin(s.adminNotifyTest))
 
 	// Admin 트랙 동기화 — batch-backfill track lists for albums that lack them
 	mux.HandleFunc("GET /admin/tracks/status", s.requireAdmin(s.adminTracksStatus))
