@@ -898,6 +898,7 @@ func (s *server) checkAppleReleasesBatch(ctx context.Context, limit int) (releas
 			item := releaseCheckItem{ID: c.ID, Name: c.Label, Albums: make([]string, 0, len(saved))}
 			for _, sv := range saved {
 				item.Albums = append(item.Albums, sv.Name)
+				item.AlbumIDs = append(item.AlbumIDs, sv.ID)
 			}
 			res.Artists = append(res.Artists, item)
 			res.NewAlbums += len(saved)
@@ -945,12 +946,17 @@ func (s *server) sweepAppleReleases(ctx context.Context) {
 		return
 	}
 	checked, albums := 0, 0
-	var unlinked []string
+	var unlinked, newIDs []string
+	// 중간에 오류로 끊겨도 그때까지 저장된 앨범은 알린다.
+	defer func() { s.notifyNewAlbums(ctx, newIDs) }()
 	for {
 		res, err := s.checkAppleReleasesBatch(ctx, sweepBatch)
 		checked += res.Checked
 		albums += res.NewAlbums
 		unlinked = append(unlinked, res.Unlinked...)
+		for _, a := range res.Artists {
+			newIDs = append(newIDs, a.AlbumIDs...)
+		}
 		if err != nil {
 			log.Printf("release sweep: DB 오류로 중단: %v", err)
 			return

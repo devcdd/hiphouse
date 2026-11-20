@@ -735,6 +735,24 @@
         }
       }
     },
+    "/admin/notify/test": {
+      "post": {
+        "tags": ["albums"],
+        "summary": "신보 알림 메일 테스트 발송 (관리자)",
+        "description": "최근 발매일 순으로 limit장을 골라 서버 스윕이 보내는 것과 같은 템플릿으로 NOTIFY_EMAIL_TO(비면 SMTP_USER)에 보낸다. 제목 앞에 [테스트]가 붙는다. 본문은 생략해도 된다.",
+        "requestBody": {
+          "required": false,
+          "content": { "application/json": { "schema": { "type": "object", "properties": {
+            "limit": { "type": "integer", "default": 5, "minimum": 1, "maximum": 30 }
+          } } } }
+        },
+        "responses": {
+          "200": { "description": "{sent, to:[주소]}" },
+          "400": { "description": "SMTP_USER·SMTP_PASSWORD 미설정" },
+          "502": { "description": "SMTP 발송 실패 (인증 실패 등)" }
+        }
+      }
+    },
     "/admin/tracks/status": {
       "get": {
         "tags": ["albums"],

@@ -83,15 +83,17 @@ const albumCols = "id,name,release_date,year,album_type,total_tracks,image_url,s
 // id-only inner query too, where the select list isn't available.
 const ratingAvgExpr = "(rating_sum::float / NULLIF(rating_count, 0) / 2)"
 
-const albumSelectCols = albumCols + `,
-	display_name,
-	apple_id, label, genres, copyright, content_rating, editorial_notes,
-	CASE ` + effTypeExpr + `
+const typeLabelExpr = `CASE ` + effTypeExpr + `
 	     WHEN 'album' THEN '정규'
 	     WHEN 'ep' THEN 'EP'
 	     WHEN 'single' THEN '싱글'
 	     WHEN 'compilation' THEN '컴필레이션'
-	     ELSE album_type END AS type_label,
+	     ELSE album_type END`
+
+const albumSelectCols = albumCols + `,
+	display_name,
+	apple_id, label, genres, copyright, content_rating, editorial_notes,
+	` + typeLabelExpr + ` AS type_label,
 	` + ratingAvgExpr + ` AS rating_avg,
 	rating_count,
 	comment_count,
