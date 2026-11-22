@@ -49,14 +49,15 @@ type RatedAlbum struct {
 // done. Unlike PublicUser this carries the role and the private-ish activity
 // counts (즐겨찾기·팔로우), which is why it is admin-only.
 type AdminUser struct {
-	ID            string `json:"id" db:"id"`
-	Nickname      string `json:"nickname" db:"nickname"`
-	Role          string `json:"role" db:"role"`
-	CreatedAt     string `json:"created_at" db:"created_at"`
-	RatingCount   int    `json:"rating_count" db:"rating_count"`
-	CommentCount  int    `json:"comment_count" db:"comment_count"`
-	FavoriteCount int    `json:"favorite_count" db:"favorite_count"`
-	FollowCount   int    `json:"follow_count" db:"follow_count"`
+	ID            string  `json:"id" db:"id"`
+	Nickname      string  `json:"nickname" db:"nickname"`
+	Role          string  `json:"role" db:"role"`
+	CreatedAt     string  `json:"created_at" db:"created_at"`
+	RatingCount   int     `json:"rating_count" db:"rating_count"`
+	CommentCount  int     `json:"comment_count" db:"comment_count"`
+	FavoriteCount int     `json:"favorite_count" db:"favorite_count"`
+	FollowCount   int     `json:"follow_count" db:"follow_count"`
+	DeleteAfter   *string `json:"delete_after" db:"delete_after"`
 }
 
 // GET /admin/users?q=&limit=&offset= — 가입 최신순 회원 목록. q는 닉네임/ID 부분 일치.
@@ -69,7 +70,8 @@ func (s *server) adminListUsers(w http.ResponseWriter, r *http.Request) {
 		       (SELECT COUNT(*)::int FROM ratings rt WHERE rt.user_id = u.id) AS rating_count,
 		       (SELECT COUNT(*)::int FROM comments c WHERE c.user_id = u.id AND c.deleted_at IS NULL) AS comment_count,
 		       (SELECT COUNT(*)::int FROM favorites f WHERE f.user_id = u.id) AS favorite_count,
-		       (SELECT COUNT(*)::int FROM follows fl WHERE fl.user_id = u.id) AS follow_count
+		       (SELECT COUNT(*)::int FROM follows fl WHERE fl.user_id = u.id) AS follow_count,
+		       `+deleteAfterExpr+`
 		FROM users u
 		WHERE $1 = '' OR u.nickname ILIKE '%' || $1 || '%' OR u.id ILIKE '%' || $1 || '%'
 		ORDER BY u.created_at DESC, u.id LIMIT $2 OFFSET $3`, q, limit, offset)

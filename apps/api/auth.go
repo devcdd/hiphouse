@@ -29,14 +29,16 @@ type User struct {
 	NicknameSet bool `json:"nickname_set" db:"nickname_set"`
 	// AvatarURL은 API 기준 경로다(예: /users/123/avatar?v=...). 이미지가 없으면 null.
 	AvatarURL *string `json:"avatar_url" db:"avatar_url"`
+	// DeleteAfter는 탈퇴 신청 뒤 영구 삭제될 시각(UTC ISO 8601)이다. 신청하지 않았으면 null.
+	DeleteAfter *string `json:"delete_after" db:"delete_after"`
 }
 
 // userCols는 RETURNING에도 쓰여서 users 한 행만으로 계산되는 식만 넣을 수 있다.
 // 순서를 바꾸면 scanDest도 같이 바꾼다.
-const userCols = "id,nickname,role,profile_public,nickname_set," + avatarURLExpr
+const userCols = "id,nickname,role,profile_public,nickname_set," + avatarURLExpr + "," + deleteAfterExpr
 
 func (u *User) scanDest() []any {
-	return []any{&u.ID, &u.Nickname, &u.Role, &u.ProfilePublic, &u.NicknameSet, &u.AvatarURL}
+	return []any{&u.ID, &u.Nickname, &u.Role, &u.ProfilePublic, &u.NicknameSet, &u.AvatarURL, &u.DeleteAfter}
 }
 
 type ctxKey string

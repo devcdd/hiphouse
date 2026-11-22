@@ -83,7 +83,8 @@ func main() {
 	mux.HandleFunc("POST /auth/logout", s.logout)
 	mux.HandleFunc("GET /me", s.requireAuth(s.me))
 	mux.HandleFunc("PUT /me", s.requireAuth(s.updateMe))
-	mux.HandleFunc("DELETE /me", s.requireAuth(s.withdraw))
+	mux.HandleFunc("DELETE /me", s.requireAuth(s.requestWithdraw))
+	mux.HandleFunc("POST /me/withdraw/cancel", s.requireAuth(s.cancelWithdraw))
 	mux.HandleFunc("PUT /me/avatar", s.requireAuth(s.putAvatar))
 	mux.HandleFunc("DELETE /me/avatar", s.requireAuth(s.deleteAvatar))
 	mux.HandleFunc("GET /me/wall", s.requireAuth(s.listMyWallPosts))
@@ -168,6 +169,7 @@ func main() {
 
 	mux.HandleFunc("GET /admin/stats", s.requireAdmin(s.adminStats))
 	mux.HandleFunc("GET /admin/users", s.requireAdmin(s.adminListUsers))
+	mux.HandleFunc("DELETE /admin/users/{id}", s.requireAdmin(s.adminPurgeUser))
 	mux.HandleFunc("GET /admin/artist-claims", s.requireAdmin(s.adminListClaims))
 	mux.HandleFunc("PUT /admin/artist-claims/{userId}", s.requireAdmin(s.adminReviewClaim))
 	mux.HandleFunc("GET /admin/not-hiphop", s.requireAdmin(s.adminListFlagged(tblNotHiphop)))
@@ -214,6 +216,7 @@ func main() {
 		}
 	}()
 	go s.scheduleReleaseSweep(ctx)
+	go s.schedulePurge(ctx)
 
 	log.Printf("listening on :%s  (swagger: http://localhost:%s/swagger/)", port, port)
 	srv := &http.Server{Addr: ":" + port, Handler: logRequests(mux), ReadHeaderTimeout: 5 * time.Second}
@@ -270,6 +273,8 @@ func (s *server) ensureAuthSchema(ctx context.Context) error {
 		CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users (email) WHERE email IS NOT NULL;
 		-- 프로필 이미지(avatar.go). users에는 avatar_url 버전용 시각만 두고 바이트는 따로 둔다.
 		ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS avatar_updated_at TIMESTAMPTZ;
+		-- 탈퇴 신청 뒤 영구 삭제할 시각(withdraw.go). NULL이면 탈퇴 신청이 없다.
+		ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS delete_after TIMESTAMPTZ;
 		CREATE TABLE IF NOT EXISTS user_avatars (
 			user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
 			data BYTEA NOT NULL,
