@@ -283,3 +283,43 @@ button.menuItem {
   font-weight: 700;
   cursor: pointer;
 }
+
+/* 아바타 자체도 파일 선택 버튼이다. 오른쪽 아래 카메라 배지로 누를 수 있다는 걸 알린다. */
+.avatarPick {
+  position: relative;
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+
+.avatarPick:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.avatarPick:hover:not(:disabled) img,
+.avatarPick:focus-visible img {
+  filter: brightness(0.85);
+}
+
+.avatarPick:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+
+.avatarPickBadge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--fg);
+  color: var(--bg);
+}

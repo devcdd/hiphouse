@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronLeft } from 'lucide-react'
+import { Camera, ChevronLeft } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { deleteAvatar, useAuth, updateNickname, uploadAvatar } from '@/entities/session'
 import type { User } from '@/entities/session'
@@ -108,14 +108,26 @@ function AvatarSection() {
     onError: (e: Error) => toast(e.message || '프로필 사진 삭제에 실패했습니다', 'error'),
   })
   const busy = upload.isPending || remove.isPending
+  const pickFile = () => fileInput.current?.click()
 
   return (
     <section className={styles.card}>
       <span className={styles.label}>프로필 사진</span>
       <div className={styles.avatarRow}>
-        <Avatar src={user?.avatar_url ? apiUrl(user.avatar_url) : null} name={user?.nickname || '사용자'} size={72} />
+        <button
+          type="button"
+          className={styles.avatarPick}
+          disabled={busy}
+          onClick={pickFile}
+          aria-label={user?.avatar_url ? '프로필 사진 바꾸기' : '프로필 사진 올리기'}
+        >
+          <Avatar src={user?.avatar_url ? apiUrl(user.avatar_url) : null} name={user?.nickname || '사용자'} size={72} />
+          <span className={styles.avatarPickBadge} aria-hidden>
+            <Camera size={13} />
+          </span>
+        </button>
         <div className={styles.avatarActions}>
-          <button type="button" className={styles.save} disabled={busy} onClick={() => fileInput.current?.click()}>
+          <button type="button" className={styles.save} disabled={busy} onClick={pickFile}>
             {upload.isPending ? '올리는 중…' : user?.avatar_url ? '사진 바꾸기' : '사진 올리기'}
           </button>
           {user?.avatar_url && (
