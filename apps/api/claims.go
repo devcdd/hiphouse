@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -11,7 +12,7 @@ import (
 const maxClaimNoteLen = 200
 
 // ArtistClaim은 "아티스트 본인입니다" 신청 한 건이다. 사용자당 하나만 두고,
-// 관리자가 approved로 바꾸면 담벼락에서 그 사용자의 이름이 아티스트명으로 표시된다.
+// 관리자가 approved로 바꾸면 담벼락에서 그 사용자의 글에 인증 배지가 붙는다.
 type ArtistClaim struct {
 	UserID            string  `json:"user_id" db:"user_id"`
 	Nickname          string  `json:"nickname" db:"nickname"`
@@ -31,8 +32,9 @@ const claimSelect = `SELECT c.user_id, u.nickname, c.artist_id, ar.name AS artis
 	to_char(c.reviewed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS reviewed_at
 	FROM artist_claims c JOIN users u ON u.id = c.user_id JOIN artists ar ON ar.id = c.artist_id`
 
-func (s *server) getClaim(r *http.Request, userID string) (*ArtistClaim, error) {
-	rows, err := s.db.Query(r.Context(), claimSelect+" WHERE c.user_id=$1", userID)
+// loadClaim은 신청이 없으면 (nil, nil)을 준다.
+func (s *server) loadClaim(ctx context.Context, userID string) (*ArtistClaim, error) {
+	rows, err := s.db.Query(ctx, claimSelect+" WHERE c.user_id=$1", userID)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +47,7 @@ func (s *server) getClaim(r *http.Request, userID string) (*ArtistClaim, error) 
 
 // getMyClaim은 신청이 없으면 null을 준다.
 func (s *server) getMyClaim(w http.ResponseWriter, r *http.Request) {
-	c, err := s.getClaim(r, currentUser(r).ID)
+	c, err := s.loadClaim(r.Context(), currentUser(r).ID)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -82,17 +84,22 @@ func (s *server) putMyClaim(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	userID := currentUser(r).ID
-	if _, err := s.db.Exec(r.Context(), `
+	tag, err := s.db.Exec(r.Context(), `
 		INSERT INTO artist_claims(user_id, artist_id, note) VALUES($1,$2,$3)
 		ON CONFLICT(user_id) DO UPDATE SET artist_id=EXCLUDED.artist_id, note=EXCLUDED.note,
 		  status='pending', created_at=now(), reviewed_at=NULL
 		WHERE artist_claims.artist_id <> EXCLUDED.artist_id OR artist_claims.note <> EXCLUDED.note
 		   OR artist_claims.status = 'rejected'`,
-		userID, artistID, note); err != nil {
+		userID, artistID, note)
+	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	c, err := s.getClaim(r, userID)
+	// 바뀐 게 없는 재전송은 ON CONFLICT의 WHERE에 걸려 0행이라 알림을 다시 보내지 않는다.
+	if tag.RowsAffected() > 0 {
+		go s.notifyClaim(userID)
+	}
+	c, err := s.loadClaim(r.Context(), userID)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -173,7 +180,7 @@ func (s *server) adminReviewClaim(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, "claim not found")
 		return
 	}
-	c, err := s.getClaim(r, userID)
+	c, err := s.loadClaim(r.Context(), userID)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
