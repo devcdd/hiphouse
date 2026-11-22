@@ -148,8 +148,9 @@ const searchSep = `[[:space:][:punct:]·’‘“”…]*`
 // hyphens/spaces count as word breaks, so "dragon" still finds "G-DRAGON").
 // Anything with a non-ASCII rune keeps infix: 한글 이름에는 단어 경계가 없어서
 // ("심야" ← "김심야") 접두 매칭으로는 찾을 수 없다.
+// 초성 자모는 음절 범위로 바꿔서 "ㅂㅈㄴ"이나 "빈지ㄴ"으로도 "빈지노"를 찾는다.
 func searchMatch(q string) (op, val string) {
-	var parts []string
+	var kept []rune
 	ascii := true
 	for _, r := range q {
 		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
@@ -158,10 +159,19 @@ func searchMatch(q string) (op, val string) {
 		if r > unicode.MaxASCII {
 			ascii = false
 		}
-		parts = append(parts, regexp.QuoteMeta(string(r)))
+		kept = append(kept, r)
 	}
-	if len(parts) == 0 { // 문장부호만 친 경우는 그대로 부분 일치로 찾는다
+	if len(kept) == 0 { // 문장부호만 친 경우는 그대로 부분 일치로 찾는다
 		return " ~* ", regexp.QuoteMeta(q)
+	}
+	parts := make([]string, len(kept))
+	for i, r := range kept {
+		parts[i] = regexp.QuoteMeta(string(r))
+		// 초성만 친 글자는 그 초성으로 시작하는 음절과 맞춘다. 한 글자뿐이면 그 초성이 든 이름이
+		// 전부 나와서 쓸모가 없으므로 글자 그대로 찾는다.
+		if class, ok := chosungClass(r); ok && len(kept) > 1 {
+			parts[i] = class
+		}
 	}
 	val = strings.Join(parts, searchSep)
 	if ascii {
