@@ -6,8 +6,8 @@ import { returnPath } from '@/features/auth'
 import { useToast } from '@/shared/ui/toast'
 import styles from './WelcomePage.module.css'
 
-// /welcome — 첫 로그인 온보딩. 카카오가 준 이름으로 인사하고 닉네임을 받는다.
-// 닉네임을 저장하지 않고 나가면 nickname_set이 false로 남아 다음 로그인 때 다시 온다.
+// /welcome — 첫 로그인 온보딩. 카카오가 준 이름이 있으면 그 이름으로 인사하고 닉네임을 받는다.
+// 닉네임을 저장하기 전에는 Layout(useNicknameRedirect)이 다른 화면으로 가지 못하게 이리로 돌려보낸다.
 export function WelcomePage() {
   const { user, isAuthed, isLoading } = useAuth()
   const qc = useQueryClient()
