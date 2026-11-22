@@ -99,6 +99,8 @@ func main() {
 
 	// 링크 스크래퍼용 메타 프리렌더 (nginx가 봇 UA만 여기로 넘긴다)
 	mux.HandleFunc("GET /og/albums/{id}", s.ogAlbum)
+	mux.HandleFunc("GET /og/artists/{id}", s.ogArtist)
+	mux.HandleFunc("GET /sitemap.xml", s.sitemap)
 
 	// Favorites (auth required)
 	mux.HandleFunc("GET /favorites", s.requireAuth(s.listFavorites))

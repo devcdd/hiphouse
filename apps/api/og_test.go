@@ -92,3 +92,74 @@ func TestOGTemplateEscapesAttributes(t *testing.T) {
 		t.Fatalf("unescaped markup leaked into the page:\n%s", b.String())
 	}
 }
+
+func TestAlbumOGPage(t *testing.T) {
+	y, typ, date, label := 2024, "정규", "2024-04-11", "AOMG"
+	avg := 4.25
+	page := buildAlbumOG("https://hiphouse.kr", "a1", "마니", "MARNI",
+		[]ogArtist{{ID: "ar1", Name: "Loopy"}}, &y, &typ, &date, &label, &avg, 3, []string{"Intro", "MARNI"})
+	var b strings.Builder
+	if err := ogTemplate.Execute(&b, page); err != nil {
+		t.Fatal(err)
+	}
+	html := b.String()
+	for _, want := range []string{
+		`<title>마니 — Loopy | 힙집</title>`,
+		`<link rel="canonical" href="https://hiphouse.kr/albums/a1">`,
+		`<a href="https://hiphouse.kr/artists/ar1">Loopy</a>`,
+		`<li>MARNI</li>`,
+		`원제: MARNI`,
+		`<script type="application/ld+json">{`,
+		`"@type":"MusicAlbum"`,
+		`"datePublished":"2024-04-11"`,
+		`"ratingCount":3`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("missing %q in:\n%s", want, html)
+		}
+	}
+}
+
+// JSON-LD 안의 앨범 이름에 </script>가 들어가도 스크립트 블록을 끝내지 못해야 한다.
+func TestOGJSONLDEscapesScriptClose(t *testing.T) {
+	page := buildAlbumOG("https://hiphouse.kr", "a1", "</script><b>x", "</script><b>x", nil, nil, nil, nil, nil, nil, 0, nil)
+	var b strings.Builder
+	if err := ogTemplate.Execute(&b, page); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(b.String(), "</script>") != 1 {
+		t.Fatalf("script block broken:\n%s", b.String())
+	}
+}
+
+func TestArtistOGPage(t *testing.T) {
+	y := 2024
+	page := buildArtistOG("https://hiphouse.kr", "ar1", "팔로알토", "Paloalto", []string{"korean hip hop"},
+		[]ogAlbumRef{{ID: "a1", Name: "Diaspora", Year: &y}})
+	var b strings.Builder
+	if err := ogTemplate.Execute(&b, page); err != nil {
+		t.Fatal(err)
+	}
+	html := b.String()
+	for _, want := range []string{
+		`<title>팔로알토 | 힙집</title>`,
+		`팔로알토의 앨범 1장.`,
+		`<a href="https://hiphouse.kr/albums/a1">Diaspora (2024)</a>`,
+		`"@type":"MusicGroup"`,
+		`"alternateName":"Paloalto"`,
+		`content="profile"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("missing %q in:\n%s", want, html)
+		}
+	}
+}
+
+func TestBuildSitemap(t *testing.T) {
+	got := string(buildSitemap("https://hiphouse.kr", []string{"/", "/albums/a&b"}))
+	if !strings.HasPrefix(got, `<?xml version="1.0" encoding="UTF-8"?>`) ||
+		!strings.Contains(got, "<loc>https://hiphouse.kr/</loc>") ||
+		!strings.Contains(got, "<loc>https://hiphouse.kr/albums/a&amp;b</loc>") {
+		t.Fatalf("sitemap:\n%s", got)
+	}
+}
