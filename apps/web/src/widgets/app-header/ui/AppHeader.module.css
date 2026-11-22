@@ -12,8 +12,9 @@
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  backdrop-filter: blur(8px);
+  /* iOS 26 Safari는 상단에 붙은 sticky 요소가 불투명할 때만 그 색으로 상태 표시줄 영역을 칠한다.
+     반투명이면 헤더 위로 스크롤된 내용이 비쳐 보인다. */
+  background: var(--bg);
 }
 
 @media (max-width: 640px) {
