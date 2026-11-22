@@ -21,6 +21,7 @@ type server struct {
 	adminIDs    map[string]bool
 	sp          *spotifyTokens
 	apple       *appleAuth
+	codeLimiter *windowLimiter
 }
 
 func main() {
@@ -57,6 +58,7 @@ func main() {
 		adminIDs:    parseAdminIDs(os.Getenv("ADMIN_KAKAO_IDS")),
 		sp:          newSpotifyTokens(),
 		apple:       &appleAuth{},
+		codeLimiter: newWindowLimiter(emailCodeIPLimit, emailCodeIPWindow),
 	}
 	if err := s.ensureAuthSchema(ctx); err != nil {
 		log.Fatalf("auth schema: %v", err)
@@ -68,6 +70,8 @@ func main() {
 
 	// Auth
 	mux.HandleFunc("POST /auth/kakao", s.loginKakao)
+	mux.HandleFunc("POST /auth/email/code", s.requestEmailCode)
+	mux.HandleFunc("POST /auth/email/signup", s.signupEmail)
 	mux.HandleFunc("POST /auth/refresh", s.refreshSession)
 	mux.HandleFunc("POST /auth/logout", s.logout)
 	mux.HandleFunc("GET /me", s.requireAuth(s.me))
@@ -249,6 +253,18 @@ func (s *server) ensureAuthSchema(ctx context.Context) error {
 		WHERE u.id = d.id AND d.rn > 1;
 		CREATE UNIQUE INDEX IF NOT EXISTS idx_users_nickname
 			ON users (lower(nickname)) WHERE nickname_set AND nickname <> '';
+		-- 이메일 가입자만 채운다(카카오 가입자는 NULL). email은 normalizeEmail로 소문자 저장.
+		ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS email TEXT;
+		ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS password_hash TEXT;
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users (email) WHERE email IS NOT NULL;
+		-- 가입 전 이메일 인증 코드. 이메일당 하나만 두고 재발송하면 덮어쓴다. 코드 원문은 저장하지 않는다.
+		CREATE TABLE IF NOT EXISTS email_codes (
+			email TEXT PRIMARY KEY,
+			code_hash TEXT NOT NULL,
+			expires_at TIMESTAMPTZ NOT NULL,
+			attempts SMALLINT NOT NULL DEFAULT 0,
+			sent_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		);
 		CREATE TABLE IF NOT EXISTS favorites (
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			album_id TEXT NOT NULL,

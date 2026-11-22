@@ -225,13 +225,17 @@ func composeNewAlbumsMail(cfg mailConfig, m newAlbumsMail, now time.Time) ([]byt
 	if err := newAlbumsText.Execute(&textBody, m); err != nil {
 		return nil, err
 	}
+	return composeMail(cfg, m.Subject, textBody.Bytes(), htmlBody.Bytes(), now)
+}
 
+// composeMail은 text/plain과 text/html을 함께 담은 multipart/alternative 메시지를 만든다.
+func composeMail(cfg mailConfig, subject string, text, html []byte, now time.Time) ([]byte, error) {
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
 	h := func(k, v string) { fmt.Fprintf(&buf, "%s: %s\r\n", k, v) }
 	h("From", mime.BEncoding.Encode("UTF-8", "HIPHOUSE")+" <"+cfg.User+">")
 	h("To", strings.Join(cfg.To, ", "))
-	h("Subject", mime.BEncoding.Encode("UTF-8", m.Subject))
+	h("Subject", mime.BEncoding.Encode("UTF-8", subject))
 	h("Date", now.Format(time.RFC1123Z))
 	h("Message-ID", "<"+randomID()+"@hiphouse.kr>")
 	h("MIME-Version", "1.0")
@@ -241,7 +245,7 @@ func composeNewAlbumsMail(cfg mailConfig, m newAlbumsMail, now time.Time) ([]byt
 	for _, part := range []struct {
 		typ  string
 		body []byte
-	}{{"text/plain", textBody.Bytes()}, {"text/html", htmlBody.Bytes()}} {
+	}{{"text/plain", text}, {"text/html", html}} {
 		pw, err := mw.CreatePart(textproto.MIMEHeader{
 			"Content-Type":              {part.typ + "; charset=UTF-8"},
 			"Content-Transfer-Encoding": {"base64"},
@@ -273,7 +277,7 @@ func randomID() string {
 	return strconv.FormatInt(time.Now().Unix(), 36) + "." + hex.EncodeToString(b)
 }
 
-// smtp.SendMail에는 타임아웃이 없어서, SMTP 서버가 응답을 멈추면 스윕 고루틴이 영영 묶인다.
+// smtp.SendMail에는 타임아웃이 없어서, SMTP 서버가 응답을 멈추면 호출한 고루틴이 영영 묶인다.
 func smtpSend(ctx context.Context, cfg mailConfig, msg []byte) error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
