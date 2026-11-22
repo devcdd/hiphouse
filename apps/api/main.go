@@ -44,6 +44,8 @@ func main() {
 	// 실측(앨범 3.4k / 트랙 13.7k): JIT on 314ms, off 8ms — 컴파일 비용이 쿼리 자체보다
 	// 40배 크다. 테이블이 작고 쿼리가 짧은 이 워크로드엔 JIT가 이득을 낼 구간이 없다.
 	cfg.ConnConfig.RuntimeParams["jit"] = "off"
+	// 오타 대비 검색의 <% 연산자는 문턱값을 이 설정에서 읽는다. 연산자를 써야 트라이그램 인덱스를 탄다.
+	cfg.ConnConfig.RuntimeParams["pg_trgm.word_similarity_threshold"] = searchFuzzyThreshold
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		log.Fatalf("db pool: %v", err)
@@ -67,6 +69,9 @@ func main() {
 	}
 	if err := s.ensureAuthSchema(ctx); err != nil {
 		log.Fatalf("auth schema: %v", err)
+	}
+	if err := s.ensureSearchSchema(ctx); err != nil {
+		log.Fatalf("search schema: %v", err)
 	}
 
 	mux := http.NewServeMux()

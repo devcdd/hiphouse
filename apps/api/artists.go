@@ -51,7 +51,7 @@ func buildArtistListQuery(q string, limit, offset int) (string, []any) {
 	order := "COALESCE(display_name, name)"
 	if q != "" {
 		sql = artistHitsCTE(q, &args) + " " + sql + " JOIN hit ON hit.artist_id = artists.id"
-		order = "hit.rank, hit.own DESC, " + order
+		order = "hit.rank, hit.dist, hit.own DESC, " + order
 	}
 	args = append(args, limit, offset)
 	return sql + " ORDER BY " + order + " LIMIT $" + strconv.Itoa(len(args)-1) + " OFFSET $" + strconv.Itoa(len(args)), args

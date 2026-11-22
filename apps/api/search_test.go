@@ -102,7 +102,7 @@ func TestBuildArtistListQuery(t *testing.T) {
 	sql, args = buildArtistListQuery("dre", 20, 0)
 	_, match := searchMatch("dre")
 	exact, prefix := searchAnchors(match)
-	if !eq(args, []any{match, exact, prefix, 20, 0}) {
+	if !eq(args, []any{match, exact, prefix, "dre", 20, 0}) {
 		t.Fatalf("args = %v", args)
 	}
 	for _, frag := range []string{
@@ -111,10 +111,18 @@ func TestBuildArtistListQuery(t *testing.T) {
 		"CASE WHEN ar.name ~* $2", "THEN 1 WHEN ar.name ~* $3", "THEN 3 ELSE 5 END AS rank",
 		// 연관검색어로만 맞은 아티스트는 제 이름으로 맞은 아티스트 뒤에 온다.
 		"(ar.name ~* $1 OR ar.display_name ~* $1) IS TRUE AS own",
-		"JOIN hit ON hit.artist_id = artists.id ORDER BY hit.rank, hit.own DESC, COALESCE(display_name, name) LIMIT $4 OFFSET $5",
+		"JOIN hit ON hit.artist_id = artists.id ORDER BY hit.rank, hit.dist, hit.own DESC, COALESCE(display_name, name) LIMIT $5 OFFSET $6",
+		"FROM q, artists ar WHERE q.j <% ar.search_jamo AND NOT EXISTS (SELECT 1 FROM matched)",
 	} {
 		if !strings.Contains(sql, frag) {
 			t.Errorf("missing %q in %s", frag, sql)
 		}
+	}
+}
+
+// 저장된 열과 검색 패턴이 같은 문자를 무시해야 한다. 한쪽만 바뀌면 오타 대비가 조용히 어긋난다.
+func TestSearchDDLUsesSearchSep(t *testing.T) {
+	if !strings.Contains(searchDDL, "regexp_replace(s, '"+strings.TrimSuffix(searchSep, "*")+"+', '', 'g')") {
+		t.Errorf("to_search_jamo should strip the searchSep class: %s", searchDDL)
 	}
 }

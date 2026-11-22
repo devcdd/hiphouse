@@ -240,9 +240,9 @@ func buildAlbumListQuery(year *int, artistID, q string, types []string, sort str
 	}
 	order := orderClause(sort)
 	// 검색에선 이름이 잘 맞은 순서가 먼저다. 같은 순위에서는 수상작을 위로 올린다. 이름만 스쳐 맞은
-	// 앨범보다 찾던 앨범일 확률이 높다.
+	// 앨범보다 찾던 앨범일 확률이 높다. dist는 오타로 찾았을 때만 0이 아니다.
 	if q != "" {
-		order = "hit.rank, " + awardedExpr + " DESC, " + order
+		order = "hit.rank, hit.dist, " + awardedExpr + " DESC, " + order
 	}
 	args = append(args, limit, offset)
 	page := where + " ORDER BY " + order + " LIMIT $" + strconv.Itoa(len(args)-1) + " OFFSET $" + strconv.Itoa(len(args))
@@ -253,7 +253,7 @@ func buildAlbumListQuery(year *int, artistID, q string, types []string, sort str
 	}
 	// 검색은 바깥 정렬에도 순위가 필요해서 IN 대신 JOIN으로 순위를 들고 나온다.
 	return "SELECT " + albumSelectCols + " FROM albums JOIN (" + hits +
-		" SELECT albums.id AS album_id, hit.rank FROM albums JOIN hit ON hit.album_id = albums.id" + page +
+		" SELECT albums.id AS album_id, hit.rank, hit.dist FROM albums JOIN hit ON hit.album_id = albums.id" + page +
 		") hit ON hit.album_id = albums.id ORDER BY " + order, args
 }
 

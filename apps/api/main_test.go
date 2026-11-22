@@ -33,14 +33,14 @@ func TestAlbumArtistsJSON(t *testing.T) {
 }
 
 func TestBuildAlbumListQuery(t *testing.T) {
-	// year + artist filters present: placeholders must be $1..$7 in order.
+	// year + artist filters present: placeholders must be $1..$8 in order.
 	y := 2024
 	// Multi-type (single OR ep): predicates inlined (no args), so placeholders stay year/artist/q + limit/offset.
-	// 검색어는 패턴 셋(부분 일치, 통째 일치, 앞부분 일치)으로 들어간다.
+	// 검색어는 패턴 셋(부분 일치, 통째 일치, 앞부분 일치)과 오타 대비에 쓸 원문으로 들어간다.
 	sql, args := buildAlbumListQuery(&y, "abc", "dre", []string{"single", "ep"}, "tracks", "hide", false, 10, 5)
 	_, match := searchMatch("dre")
 	exact, prefix := searchAnchors(match)
-	if !eq(args, []any{2024, "abc", match, exact, prefix, 10, 5}) {
+	if !eq(args, []any{2024, "abc", match, exact, prefix, "dre", 10, 5}) {
 		t.Fatalf("args = %v", args)
 	}
 	for _, frag := range []string{
@@ -52,7 +52,7 @@ func TestBuildAlbumListQuery(t *testing.T) {
 		"ar.name ~* $3", "ar.display_name ~* $3", "al ~* $3",
 		"t.name ~* $3", "t.display_name ~* $3",
 		typeCond("single"), typeCond("ep"), " OR ",
-		"total_tracks DESC", "LIMIT $6", "OFFSET $7",
+		"total_tracks DESC", "LIMIT $7", "OFFSET $8",
 	} {
 		if !strings.Contains(sql, frag) {
 			t.Errorf("missing %q in %s", frag, sql)
@@ -72,7 +72,7 @@ func TestBuildAlbumListQuery(t *testing.T) {
 		t.Errorf("both phases must carry the same ORDER BY: %s", sql)
 	}
 	// 검색어가 있으면 이름이 잘 맞은 순위가 먼저고 그다음이 수상작이다. 두 단계 모두 같은 ORDER BY를 써야 한다.
-	if strings.Count(sql, "ORDER BY hit.rank, EXISTS (SELECT 1 FROM awards aw WHERE aw.album_id = albums.id) DESC, ") != 2 {
+	if strings.Count(sql, "ORDER BY hit.rank, hit.dist, EXISTS (SELECT 1 FROM awards aw WHERE aw.album_id = albums.id) DESC, ") != 2 {
 		t.Errorf("search should order by rank then awarded in both phases: %s", sql)
 	}
 	// 앨범 이름, 아티스트 이름, 수록곡 이름이 통째로 맞았는지에 따라 순위가 갈린다.
@@ -80,7 +80,11 @@ func TestBuildAlbumListQuery(t *testing.T) {
 		"CASE WHEN albums.name ~* $4 OR albums.display_name ~* $4 THEN 0 WHEN albums.name ~* $5 OR albums.display_name ~* $5 THEN 2 ELSE 5 END",
 		"CASE WHEN ar.name ~* $4",
 		"CASE WHEN t.name ~* $4 OR t.display_name ~* $4 THEN 4",
-		"SELECT album_id, min(rank) AS rank FROM matched GROUP BY album_id",
+		// 오타 대비는 제대로 맞은 결과가 하나도 없고 검색어가 충분히 길 때만 돈다.
+		"q AS MATERIALIZED (SELECT to_search_jamo(ARRAY[$6::text]) AS j)",
+		"albums WHERE q.j <% albums.search_jamo", "WHERE q.j <% ar.search_jamo", "tracks t WHERE q.j <% t.search_jamo",
+		"SELECT * FROM fuzzy WHERE NOT EXISTS (SELECT 1 FROM matched) AND (SELECT length(j) >= 5 FROM q)",
+		"SELECT album_id, min(rank) AS rank, min(dist) AS dist FROM (",
 	} {
 		if !strings.Contains(sql, frag) {
 			t.Errorf("missing %q in %s", frag, sql)
