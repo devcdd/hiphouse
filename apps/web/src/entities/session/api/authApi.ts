@@ -25,6 +25,20 @@ export function loginWithKakao(code: string, redirectUri: string): Promise<Sessi
   return apiPost('/auth/kakao', { code, redirect_uri: redirectUri })
 }
 
+export interface EmailCodeSent {
+  expires_in: number // 초
+  resend_after: number // 초
+}
+
+// 가입 전 이메일 인증 코드를 메일로 보낸다. 이미 가입된 이메일이면 409.
+export function requestEmailCode(email: string): Promise<EmailCodeSent> {
+  return apiPost('/auth/email/code', { email })
+}
+
+export function signupWithEmail(email: string, password: string, code: string): Promise<Session> {
+  return apiPost('/auth/email/signup', { email, password, code })
+}
+
 // Revokes the refresh token server-side. Never rejects — signing out locally
 // must not depend on the network.
 export function logout(refreshToken: string | null): Promise<void> {
