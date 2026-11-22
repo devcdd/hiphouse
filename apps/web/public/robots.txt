@@ -26,3 +26,5 @@ User-agent: *
 Disallow: /admin
 Disallow: /api/
 Crawl-delay: 2
+
+Sitemap: https://hiphouse.kr/sitemap.xml

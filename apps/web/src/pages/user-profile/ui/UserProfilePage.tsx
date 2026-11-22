@@ -12,6 +12,7 @@ import { Avatar } from '@/shared/ui/Avatar'
 import { useToast } from '@/shared/ui/toast'
 import { fetchPublicRatedAlbums, fetchPublicUser, RATED_PAGE_SIZE } from '../api/userApi'
 import styles from './UserProfilePage.module.css'
+import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 
 const joined = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'long' })
 
@@ -26,6 +27,7 @@ export function UserProfilePage() {
   const { user } = useAuth()
   const isOwner = !!user && user.id === id
   const profile = useQuery({ queryKey: ['user', id], queryFn: () => fetchPublicUser(id), enabled: !!id })
+  useDocumentTitle(profile.data?.nickname ? `${profile.data.nickname}님의 프로필` : null)
   // 주인이 아닐 때만 가린다. 서버도 같은 기준이라 hidden이면 목록은 어차피 빈 배열이다.
   const hidden = !isOwner && profile.data?.profile_public === false
   const [sort, setSort] = useRatedSort()

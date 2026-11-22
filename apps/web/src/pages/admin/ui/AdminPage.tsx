@@ -16,6 +16,7 @@ import 'swiper/css'
 import 'swiper/css/free-mode'
 import 'swiper/css/mousewheel'
 import styles from './AdminPage.module.css'
+import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 
 type Tab = 'deleted' | 'aliases' | 'crawl' | 'tracks' | 'releases' | 'stats' | 'reports' | 'rename' | 'users' | 'claims'
 const TABS: { key: Tab; label: string }[] = [
@@ -32,6 +33,7 @@ const TABS: { key: Tab; label: string }[] = [
 ]
 
 export function AdminPage() {
+  useDocumentTitle('관리자')
   const { isAdmin, isAdminUser, isLoading } = useAuth()
   const [params, setParams] = useSearchParams()
   const raw = params.get('tab')

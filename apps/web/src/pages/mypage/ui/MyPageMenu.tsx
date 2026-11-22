@@ -3,6 +3,7 @@ import { ChevronRight, Pencil, Star, Heart, MessagesSquare, UserPlus, UserRound,
 import { useAuth, useAdminMode, setAdminMode } from '@/entities/session'
 import { AuthGate } from './AuthGate'
 import styles from './MyPage.module.css'
+import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 
 // /me — 각 섹션으로 들어가는 진입 메뉴. 공개 설정은 여기 없다. 공개 프로필 페이지에
 // 붙어 있어야 "남에게 어떻게 보이나"를 그 자리에서 확인하며 끄고 켤 수 있다.
@@ -15,6 +16,7 @@ const ITEMS = [
 ]
 
 export function MyPageMenu() {
+  useDocumentTitle('마이페이지')
   return (
     <AuthGate>
       <Menu />

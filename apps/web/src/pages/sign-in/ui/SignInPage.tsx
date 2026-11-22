@@ -6,9 +6,11 @@ import { loginWithEmail, useAuth } from '@/entities/session'
 import { afterSignInPath, returnPath, startKakaoLogin } from '@/features/auth'
 import { useToast } from '@/shared/ui/toast'
 import styles from './SignInPage.module.css'
+import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 
 // /sign-in?next=... — 로그인 수단 선택. next는 로그인을 시작한 페이지다.
 export function SignInPage() {
+  useDocumentTitle('로그인')
   const { isAuthed, isLoading, signIn } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()

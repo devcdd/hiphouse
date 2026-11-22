@@ -11,12 +11,14 @@ import { ArtistWall } from '@/features/artist-wall'
 import { Avatar } from '@/shared/ui/Avatar'
 import { displayName } from '@/shared/lib/displayName'
 import styles from './ArtistDetailPage.module.css'
+import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 
 export function ArtistDetailPage() {
   const { id = '' } = useParams()
   const { data: artist, isLoading, error } = useArtist(id)
   const { isAdmin } = useAuth()
   const name = artist ? displayName(artist) : id
+  useDocumentTitle(artist ? name : null)
 
   return (
     <div className={styles.page}>

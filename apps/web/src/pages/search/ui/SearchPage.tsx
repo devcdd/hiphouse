@@ -2,6 +2,7 @@ import { useSearchParams } from 'react-router-dom'
 import { AlbumFeed } from '@/widgets/album-feed'
 import { ArtistGrid } from '@/widgets/artist-grid'
 import styles from './SearchPage.module.css'
+import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 
 type Tab = 'album' | 'artist'
 const TABS: { key: Tab; label: string }[] = [
@@ -13,6 +14,7 @@ export function SearchPage() {
   const [params, setParams] = useSearchParams()
   const q = params.get('q') ?? ''
   const tab: Tab = params.get('type') === 'artist' ? 'artist' : 'album'
+  useDocumentTitle(q ? `'${q}' 검색` : '검색')
 
   const setTab = (t: Tab) => setParams({ q, type: t }, { replace: true })
 

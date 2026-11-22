@@ -19,6 +19,7 @@ import { displayName } from '@/shared/lib/displayName'
 import { AlbumDetailSkeleton } from './AlbumDetailSkeleton'
 import { TrackList } from './TrackList'
 import styles from './AlbumDetailPage.module.css'
+import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 
 // Apple 기기는 Music 앱이 기본 설치라 music:// 스킴으로 앱을 바로 연다. iPadOS는 UA가 Macintosh로 잡혀도 같이 걸린다.
 const isApple = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent)
@@ -28,6 +29,7 @@ export function AlbumDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const { data: album, isLoading: loading, error } = useAlbum(id)
+  useDocumentTitle(album ? [displayName(album), album.artists.map(displayName).join(', ')].filter(Boolean).join(' — ') : null)
   const { isAuthed, isAdmin } = useAuth()
   const startSignIn = useStartSignIn()
   const theme = useResolvedTheme() // Apple 임베드는 ?theme=만 읽어 테마가 바뀌면 src 변경으로 다시 불러온다

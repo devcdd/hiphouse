@@ -4,8 +4,10 @@ import { useFavoriteAlbums } from '@/features/favorite-album'
 import { useMyGiven } from '@/features/rate-album'
 import { useStartSignIn } from '@/features/auth'
 import styles from './FavoritesPage.module.css'
+import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 
 export function FavoritesPage() {
+  useDocumentTitle('즐겨찾기')
   const { isAuthed } = useAuth()
   const startSignIn = useStartSignIn()
   const { data: albums, isLoading } = useFavoriteAlbums(isAuthed)

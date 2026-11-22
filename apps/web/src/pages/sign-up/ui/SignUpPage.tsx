@@ -1,9 +1,11 @@
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { signupWithEmail, useAuth } from '@/entities/session'
 import { EmailCodeFlow, afterSignInPath, returnPath } from '@/features/auth'
+import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 
 // /sign-up?next=... — 이메일 가입. 인증 코드를 받은 뒤 코드와 비밀번호를 함께 보내야 계정이 생긴다.
 export function SignUpPage() {
+  useDocumentTitle('회원가입')
   const { isAuthed, isLoading, signIn } = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
