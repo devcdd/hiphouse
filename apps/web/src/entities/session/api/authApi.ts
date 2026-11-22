@@ -30,13 +30,24 @@ export interface EmailCodeSent {
   resend_after: number // 초
 }
 
-// 가입 전 이메일 인증 코드를 메일로 보낸다. 이미 가입된 이메일이면 409.
-export function requestEmailCode(email: string): Promise<EmailCodeSent> {
-  return apiPost('/auth/email/code', { email })
+export type EmailCodePurpose = 'signup' | 'reset'
+
+// 이메일 인증 코드를 메일로 보낸다. signup은 이미 가입된 이메일이면 409, reset은 이메일 계정이 없으면 404.
+export function requestEmailCode(email: string, purpose: EmailCodePurpose = 'signup'): Promise<EmailCodeSent> {
+  return apiPost('/auth/email/code', { email, purpose })
 }
 
 export function signupWithEmail(email: string, password: string, code: string): Promise<Session> {
   return apiPost('/auth/email/signup', { email, password, code })
+}
+
+export function loginWithEmail(email: string, password: string): Promise<Session> {
+  return apiPost('/auth/email/login', { email, password })
+}
+
+// 비밀번호를 바꾸면 다른 기기의 로그인은 모두 끊기고, 이 요청에 새 세션이 온다.
+export function resetPassword(email: string, password: string, code: string): Promise<Session> {
+  return apiPost('/auth/email/reset', { email, password, code })
 }
 
 // Revokes the refresh token server-side. Never rejects — signing out locally

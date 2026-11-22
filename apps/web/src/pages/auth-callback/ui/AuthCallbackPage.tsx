@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { loginWithKakao, useAuth } from '@/entities/session'
-import { returnPath } from '@/features/auth'
+import { afterSignInPath, returnPath } from '@/features/auth'
 import { kakaoRedirectUri } from '@/shared/config'
 import styles from './AuthCallbackPage.module.css'
 
@@ -23,9 +23,7 @@ export function AuthCallbackPage() {
     loginWithKakao(code, kakaoRedirectUri())
       .then((res) => {
         signIn(res.token, res.refresh_token, res.user)
-        // 닉네임을 아직 본인이 정하지 않았으면 인사 + 닉네임 설정부터 (끝나면 next로).
-        const next = returnPath(params.get('state'))
-        navigate(res.user.nickname_set ? next : `/welcome?next=${encodeURIComponent(next)}`, { replace: true })
+        navigate(afterSignInPath(res.user, returnPath(params.get('state'))), { replace: true })
       })
       .catch((e: unknown) => setError(String(e)))
   }, [params, signIn, navigate])

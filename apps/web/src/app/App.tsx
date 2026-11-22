@@ -12,6 +12,7 @@ import { AdminPage } from '@/pages/admin'
 import { WelcomePage } from '@/pages/welcome'
 import { SignInPage } from '@/pages/sign-in'
 import { SignUpPage } from '@/pages/sign-up'
+import { ResetPasswordPage } from '@/pages/reset-password'
 
 export function App() {
   return (
@@ -25,6 +26,7 @@ export function App() {
         <Route path="/favorites" element={<FavoritesPage />} />
         <Route path="/sign-in" element={<SignInPage />} />
         <Route path="/sign-up" element={<SignUpPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/welcome" element={<WelcomePage />} />
         <Route path="/me" element={<MyPageMenu />} />
         <Route path="/me/nickname" element={<NicknamePage />} />
