@@ -231,7 +231,7 @@ function ArtistAlbumsDialog({ artist, onClose }: { artist: AppleArtistHit; onClo
   // 첫 페이지(40장)만 — 확인용 미리보기지 전체 목록이 아니다.
   const { data, isLoading, error } = useQuery({
     queryKey: ['albums', { artistId: artist.artist_id, preview: true }],
-    queryFn: () => fetchAlbums({ artistId: artist.artist_id ?? '', offset: 0 }),
+    queryFn: () => fetchAlbums({ artistId: artist.artist_id ?? '', includeDeleted: true, offset: 0 }),
   })
 
   return (

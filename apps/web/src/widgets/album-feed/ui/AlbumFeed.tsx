@@ -8,12 +8,15 @@ import { useInfiniteScroll } from '@/shared/lib/useInfiniteScroll'
 import styles from './AlbumFeed.module.css'
 
 // Album grid + infinite scroll for any filter (year / artist / search).
-// Soft-deleted albums only reach admins (server-gated) and render dimmed.
 export function AlbumFeed({ params }: { params: AlbumQuery }) {
-  const { data, fetchNextPage, hasNextPage, isFetching, isLoading, isFetchingNextPage, error } =
-    useAlbumFeed(params)
-  const albums = useMemo(() => data?.pages.flat() ?? [], [data])
   const { isAuthed, isAdmin } = useAuth()
+  // 삭제된 앨범은 관리자 모드일 때만 흐리게 섞는다. queryKey에도 들어가서 로그아웃하거나 관리자 모드를 끄면
+  // 삭제된 앨범이 섞인 캐시를 다시 보여주지 않고 새로 받는다.
+  const { data, fetchNextPage, hasNextPage, isFetching, isLoading, isFetchingNextPage, error } = useAlbumFeed({
+    ...params,
+    includeDeleted: isAdmin,
+  })
+  const albums = useMemo(() => data?.pages.flat() ?? [], [data])
   const myGiven = useMyGiven(isAuthed)
   const sentinel = useInfiniteScroll<HTMLDivElement>(fetchNextPage, hasNextPage && !isFetching)
 

@@ -314,3 +314,21 @@ func TestTypeCondPrefersAppleType(t *testing.T) {
 		t.Errorf("unknown type key must not produce a predicate")
 	}
 }
+
+func TestAlbumDeletedMode(t *testing.T) {
+	for _, tc := range []struct {
+		admin       bool
+		param, want string
+	}{
+		{true, "", "hide"}, // 관리자 모드를 끈 화면은 include를 보내지 않는다
+		{true, "include", "include"},
+		{true, "only", "only"},
+		{true, "bogus", "hide"},
+		{false, "include", "hide"},
+		{false, "only", "hide"},
+	} {
+		if got := albumDeletedMode(tc.admin, tc.param); got != tc.want {
+			t.Errorf("albumDeletedMode(%v, %q) = %q, want %q", tc.admin, tc.param, got, tc.want)
+		}
+	}
+}

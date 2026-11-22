@@ -156,6 +156,15 @@ func searchMatch(q string) (op, val string) {
 	return " ~* ", `\m` + regexp.QuoteMeta(q)
 }
 
+// albumDeletedMode는 ?deleted= 값을 buildAlbumListQuery의 deleted 인자로 바꾼다.
+// 관리자도 include를 명시해야 삭제된 앨범이 섞인다. 관리자 모드를 끈 화면은 일반 사용자와 같은 목록을 받아야 한다.
+func albumDeletedMode(isAdmin bool, param string) string {
+	if isAdmin && (param == "include" || param == "only") {
+		return param
+	}
+	return "hide"
+}
+
 // buildAlbumListQuery is pure so it can be unit-tested without a DB.
 // deleted selects soft-delete visibility: "hide" (public), "include" (admin
 // browsing — deleted rows mixed in, dimmed client-side), "only" (admin 삭제 목록).
@@ -268,23 +277,14 @@ func replaceAlbumArtists(ctx context.Context, tx pgx.Tx, albumID string, artists
 func (s *server) listAlbums(w http.ResponseWriter, r *http.Request) {
 	limit, offset := clampPage(r)
 	q := r.URL.Query()
-	// type can be comma-separated (multi-select). Admins see soft-deleted albums (dimmed client-side).
+	// type can be comma-separated (multi-select).
 	var types []string
 	for _, t := range strings.Split(q.Get("type"), ",") {
 		if t = strings.TrimSpace(t); t != "" {
 			types = append(types, t)
 		}
 	}
-	// Soft-delete visibility: public sees live albums only; admins see deleted
-	// rows mixed in, or exclusively with ?deleted=only (관리자 삭제 목록).
-	deleted := "hide"
-	if s.isAdminReq(r) {
-		if q.Get("deleted") == "only" {
-			deleted = "only"
-		} else {
-			deleted = "include"
-		}
-	}
+	deleted := albumDeletedMode(s.isAdminReq(r), q.Get("deleted"))
 	sql, args := buildAlbumListQuery(queryIntPtr(r, "year"), q.Get("artist_id"), q.Get("q"), types, q.Get("sort"), deleted, q.Get("awarded") == "1", limit, offset)
 	rows, err := s.db.Query(r.Context(), sql, args...)
 	if err != nil {
