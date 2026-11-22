@@ -78,7 +78,6 @@ export function AlbumDetailPage() {
                   </a>
                 )}
               </span>
-              {album.content_rating === 'explicit' && <span className={styles.explicitBadge}>EXPLICIT</span>}
               {album.deleted_at && <span className={styles.deletedBadge}>삭제됨</span>}
             </h1>
             <p className={styles.artist}>
