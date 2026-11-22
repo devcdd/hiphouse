@@ -22,6 +22,9 @@ type server struct {
 	sp          *spotifyTokens
 	apple       *appleAuth
 	codeLimiter *windowLimiter
+	// 이메일 로그인 실패 횟수. 이메일 기준과 IP 기준을 따로 센다.
+	loginEmailFails *windowLimiter
+	loginIPFails    *windowLimiter
 }
 
 func main() {
@@ -51,14 +54,16 @@ func main() {
 	}
 
 	s := &server{
-		db:          pool,
-		jwtSecret:   []byte(env("JWT_SECRET", "dev-insecure-secret-change-me")),
-		kakaoKey:    os.Getenv("KAKAO_REST_API_KEY"),
-		kakaoSecret: os.Getenv("KAKAO_CLIENT_SECRET"),
-		adminIDs:    parseAdminIDs(os.Getenv("ADMIN_KAKAO_IDS")),
-		sp:          newSpotifyTokens(),
-		apple:       &appleAuth{},
-		codeLimiter: newWindowLimiter(emailCodeIPLimit, emailCodeIPWindow),
+		db:              pool,
+		jwtSecret:       []byte(env("JWT_SECRET", "dev-insecure-secret-change-me")),
+		kakaoKey:        os.Getenv("KAKAO_REST_API_KEY"),
+		kakaoSecret:     os.Getenv("KAKAO_CLIENT_SECRET"),
+		adminIDs:        parseAdminIDs(os.Getenv("ADMIN_KAKAO_IDS")),
+		sp:              newSpotifyTokens(),
+		apple:           &appleAuth{},
+		codeLimiter:     newWindowLimiter(emailCodeIPLimit, emailCodeIPWindow),
+		loginEmailFails: newWindowLimiter(loginFailEmailLimit, loginFailWindow),
+		loginIPFails:    newWindowLimiter(loginFailIPLimit, loginFailWindow),
 	}
 	if err := s.ensureAuthSchema(ctx); err != nil {
 		log.Fatalf("auth schema: %v", err)
@@ -72,6 +77,8 @@ func main() {
 	mux.HandleFunc("POST /auth/kakao", s.loginKakao)
 	mux.HandleFunc("POST /auth/email/code", s.requestEmailCode)
 	mux.HandleFunc("POST /auth/email/signup", s.signupEmail)
+	mux.HandleFunc("POST /auth/email/login", s.loginEmail)
+	mux.HandleFunc("POST /auth/email/reset", s.resetPassword)
 	mux.HandleFunc("POST /auth/refresh", s.refreshSession)
 	mux.HandleFunc("POST /auth/logout", s.logout)
 	mux.HandleFunc("GET /me", s.requireAuth(s.me))
@@ -257,13 +264,15 @@ func (s *server) ensureAuthSchema(ctx context.Context) error {
 		ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS email TEXT;
 		ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS password_hash TEXT;
 		CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users (email) WHERE email IS NOT NULL;
-		-- 가입 전 이메일 인증 코드. 이메일당 하나만 두고 재발송하면 덮어쓴다. 코드 원문은 저장하지 않는다.
+		-- 이메일 인증 코드. 이메일·용도(signup/reset)마다 하나만 두고 재발송하면 덮어쓴다. 코드 원문은 저장하지 않는다.
 		CREATE TABLE IF NOT EXISTS email_codes (
-			email TEXT PRIMARY KEY,
+			email TEXT NOT NULL,
+			purpose TEXT NOT NULL,
 			code_hash TEXT NOT NULL,
 			expires_at TIMESTAMPTZ NOT NULL,
 			attempts SMALLINT NOT NULL DEFAULT 0,
-			sent_at TIMESTAMPTZ NOT NULL DEFAULT now()
+			sent_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			PRIMARY KEY (email, purpose)
 		);
 		CREATE TABLE IF NOT EXISTS favorites (
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

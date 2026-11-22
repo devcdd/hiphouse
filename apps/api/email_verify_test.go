@@ -37,12 +37,15 @@ func TestNormalizeCode(t *testing.T) {
 }
 
 func TestEmailCodeMatches(t *testing.T) {
-	h := hashEmailCode("a@b.com", "123456")
-	if !emailCodeMatches(h, "a@b.com", "123456") {
+	h := hashEmailCode(purposeSignup, "a@b.com", "123456")
+	if !emailCodeMatches(h, purposeSignup, "a@b.com", "123456") {
 		t.Fatal("right code rejected")
 	}
-	if emailCodeMatches(h, "a@b.com", "123457") || emailCodeMatches(h, "c@d.com", "123456") {
+	if emailCodeMatches(h, purposeSignup, "a@b.com", "123457") || emailCodeMatches(h, purposeSignup, "c@d.com", "123456") {
 		t.Fatal("code accepted for wrong code or other email")
+	}
+	if emailCodeMatches(h, purposeReset, "a@b.com", "123456") {
+		t.Fatal("signup code must not work as a reset code")
 	}
 }
 
@@ -63,6 +66,26 @@ func TestWindowLimiter(t *testing.T) {
 	}
 }
 
+func TestWindowLimiterFailuresOnly(t *testing.T) {
+	l := newWindowLimiter(2, time.Minute)
+	t0 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	if l.blocked("a@b.com", t0) {
+		t.Fatal("blocked before any failure")
+	}
+	l.record("a@b.com", t0)
+	if l.blocked("a@b.com", t0) {
+		t.Fatal("blocked after one failure with limit 2")
+	}
+	l.record("a@b.com", t0)
+	if !l.blocked("a@b.com", t0) {
+		t.Fatal("should be blocked after reaching the limit")
+	}
+	l.reset("a@b.com")
+	if l.blocked("a@b.com", t0) {
+		t.Fatal("reset should clear failures")
+	}
+}
+
 func TestClientIP(t *testing.T) {
 	r := httptest.NewRequest("POST", "/auth/email/code", nil)
 	r.RemoteAddr = "10.0.0.1:5555"
@@ -77,7 +100,7 @@ func TestClientIP(t *testing.T) {
 
 func TestComposeEmailCodeMail(t *testing.T) {
 	cfg := mailConfig{User: "me@gmail.com", To: []string{"new@user.kr"}}
-	raw, err := composeEmailCodeMail(cfg, "042917", time.Date(2026, 11, 22, 9, 0, 0, 0, time.UTC))
+	raw, err := composeEmailCodeMail(cfg, purposeReset, "042917", time.Date(2026, 11, 22, 9, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +117,7 @@ func TestComposeEmailCodeMail(t *testing.T) {
 	}
 	// 첫 파트(text/plain)의 헤더 다음 본문만 떼어 base64를 푼다.
 	dec, err := decodeBase64Lines([]byte(strings.Split(strings.Split(string(body), "\r\n\r\n")[1], "\r\n--")[0]))
-	if err != nil || !strings.Contains(dec, "042917") {
-		t.Errorf("text part should contain the code: %q %v", dec, err)
+	if err != nil || !strings.Contains(dec, "042917") || !strings.Contains(dec, "비밀번호 재설정") {
+		t.Errorf("text part should contain the code and reset wording: %q %v", dec, err)
 	}
 }
