@@ -27,3 +27,31 @@
   align-items: center;
   gap: 8px;
 }
+
+/* 모바일에선 유형 칩을 줄바꿈하지 않고 가로로 스크롤한다. 줄바꿈하면 싱글·수상작만 아랫줄로 떨어진다.
+   정렬 선택은 칩 줄 아래 오른쪽에 둔다. */
+@media (max-width: 640px) {
+  /* wrap을 그대로 두면 세로 flex의 줄 폭이 칩 줄 내용 폭으로 잡혀 화면 밖으로 늘어난다. */
+  .row {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .row > :last-child {
+    align-self: flex-end;
+  }
+
+  /* 위 연도 줄(YearFilter)과 같이 페이지 여백 안에서 잘리게 둔다. */
+  .group {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 2px 0;
+  }
+
+  .group::-webkit-scrollbar {
+    display: none;
+  }
+}

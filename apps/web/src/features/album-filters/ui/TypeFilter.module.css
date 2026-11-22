@@ -12,6 +12,8 @@
   color: var(--muted);
   font-size: 0.85rem;
   font-weight: 600;
+  white-space: nowrap;
+  flex: 0 0 auto;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
@@ -24,4 +26,11 @@
 .active:hover {
   background: var(--fg);
   color: var(--bg);
+}
+
+/* 홈 모바일에서 칩 줄이 가로 스크롤될 때 TypeFilter 안에서 다시 줄바꿈되지 않게 한다. */
+@media (max-width: 640px) {
+  .tabs {
+    flex-wrap: nowrap;
+  }
 }
