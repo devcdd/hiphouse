@@ -116,7 +116,10 @@
   align-items: center;
   gap: 8px;
   margin-top: 2px;
-  min-height: 15px;
+  /* line-height: normal이면 굵은 별점 숫자와 별 아이콘의 글꼴 metric에 따라 브라우저마다 줄 높이가 달라져서,
+     별점이 붙은 카드만 아래 간격이 어긋난다. 줄 높이를 고정해 내용과 관계없이 같은 높이로 둔다. */
+  height: 15px;
+  line-height: 15px;
 }
 
 .year {
