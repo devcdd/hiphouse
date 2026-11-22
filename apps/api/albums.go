@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
-	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -136,24 +135,39 @@ func orderClause(sort string) string {
 // 검색 가중치 양쪽에서 쓰고, ORDER BY에 들어가므로 albums.id만 참조한다.
 const awardedExpr = "EXISTS (SELECT 1 FROM awards aw WHERE aw.album_id = albums.id)"
 
-// likeEscape neutralizes LIKE wildcards in user input so they match literally.
-var likeEscape = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+// searchSep은 검색할 때 무시하는 문자다. 사용자가 "SS-POP"을 "ss pop"이나 "sspop"으로
+// 쳐도 찾게 하려고, 질의에서는 글자와 숫자만 남기고 글자 사이에 이 문자가 몇 개든 끼어도 맞게 한다.
+// 글자를 절대 삼키면 안 되어서 [^[:alnum:]] 대신 공백과 문장부호만 적는다. [:alnum:]이 한글을
+// 포함하는지는 DB 로케일에 따라 달라진다.
+const searchSep = `[[:space:][:punct:]·’‘“”…]*`
 
 // searchMatch picks the SQL operator + bind value for a user search query.
-// Plain infix ILIKE let short Latin queries match inside words — "ander" pulled
+// Plain infix matching let short Latin queries match inside words — "ander" pulled
 // in "wandering", "Neanderthal" and the alias "Kim Ximya X D. Sanders" — so
-// ASCII queries anchor at word starts instead (~* '\m…', case-insensitive;
+// ASCII queries anchor at word starts instead (\m, case-insensitive;
 // hyphens/spaces count as word breaks, so "dragon" still finds "G-DRAGON").
 // Anything with a non-ASCII rune keeps infix: 한글 이름에는 단어 경계가 없어서
-// ("심야" ← "김심야") 접두 매칭으로는 찾을 수 없다. A query starting with a
-// non-word rune (".paak") also keeps infix — \m never matches before it.
+// ("심야" ← "김심야") 접두 매칭으로는 찾을 수 없다.
 func searchMatch(q string) (op, val string) {
-	first, _ := utf8.DecodeRuneInString(q)
-	ascii := !strings.ContainsFunc(q, func(r rune) bool { return r > unicode.MaxASCII })
-	if !ascii || !(first == '_' || unicode.IsLetter(first) || unicode.IsDigit(first)) {
-		return " ILIKE ", "%" + likeEscape.Replace(q) + "%"
+	var parts []string
+	ascii := true
+	for _, r := range q {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+			continue
+		}
+		if r > unicode.MaxASCII {
+			ascii = false
+		}
+		parts = append(parts, regexp.QuoteMeta(string(r)))
 	}
-	return " ~* ", `\m` + regexp.QuoteMeta(q)
+	if len(parts) == 0 { // 문장부호만 친 경우는 그대로 부분 일치로 찾는다
+		return " ~* ", regexp.QuoteMeta(q)
+	}
+	val = strings.Join(parts, searchSep)
+	if ascii {
+		val = `\m` + val
+	}
+	return " ~* ", val
 }
 
 // albumDeletedMode는 ?deleted= 값을 buildAlbumListQuery의 deleted 인자로 바꾼다.

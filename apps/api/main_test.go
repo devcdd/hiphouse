@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -36,8 +37,8 @@ func TestBuildAlbumListQuery(t *testing.T) {
 	y := 2024
 	// Multi-type (single OR ep): predicates inlined (no args), so placeholders stay year/artist/q + limit/offset.
 	sql, args := buildAlbumListQuery(&y, "abc", "dre", []string{"single", "ep"}, "tracks", "hide", false, 10, 5)
-	if want := []any{2024, "abc", `\mdre`, 10, 5}; !eq(args, want) {
-		t.Fatalf("args = %v, want %v", args, want)
+	if _, q := searchMatch("dre"); !eq(args, []any{2024, "abc", q, 10, 5}) {
+		t.Fatalf("args = %v", args)
 	}
 	for _, frag := range []string{
 		"year = $1", "aa.artist_id = $2",
@@ -110,22 +111,44 @@ func TestBuildAlbumListQuery(t *testing.T) {
 
 // Latin queries anchor at word starts; 한글 queries keep infix matching.
 func TestSearchMatch(t *testing.T) {
-	for _, tc := range []struct{ q, op, val string }{
-		// ASCII → case-insensitive word-start regex: "ander" must not match
-		// mid-word ("wandering", "Neanderthal", alias "Kim Ximya X D. Sanders").
-		{"ander", " ~* ", `\mander`},
-		// Regex metacharacters in the query are literals, not syntax.
-		{"d. sanders", " ~* ", `\md\. sanders`},
-		// Non-ASCII (한글) → infix ILIKE: "심야" must still find "김심야".
-		{"심야", " ILIKE ", "%심야%"},
-		// A leading non-word char can't sit after \m (it never matches) → infix.
-		{".paak", " ILIKE ", "%.paak%"},
-		// User-typed LIKE wildcards are escaped to literals on the infix path.
-		{"백%_문", " ILIKE ", `%백\%\_문%`},
+	sep := searchSep
+	for _, tc := range []struct{ q, val string }{
+		// ASCII는 단어 시작에 고정한다. "ander"가 "wandering"이나 "Sanders" 안에서 맞으면 안 된다.
+		{"ander", `\ma` + sep + "n" + sep + "d" + sep + "e" + sep + "r"},
+		// 공백과 문장부호는 질의에서 지운다. "ss pop", "SS-POP", "sspop"이 모두 같은 패턴이 된다.
+		{"ss pop", `\ms` + sep + "s" + sep + "p" + sep + "o" + sep + "p"},
+		{"SS-POP", `\mS` + sep + "S" + sep + "P" + sep + "O" + sep + "P"},
+		// 한글은 단어 경계가 없어서 부분 일치다. "심야"로 "김심야"를 찾아야 한다.
+		{"심야", "심" + sep + "야"},
+		{".paak", `\mp` + sep + "a" + sep + "a" + sep + "k"},
+		{"%_", `%_`},
 	} {
 		op, val := searchMatch(tc.q)
-		if op != tc.op || val != tc.val {
-			t.Errorf("searchMatch(%q) = %q %q, want %q %q", tc.q, op, val, tc.op, tc.val)
+		if op != " ~* " || val != tc.val {
+			t.Errorf("searchMatch(%q) = %q %q, want ~* %q", tc.q, op, val, tc.val)
+		}
+	}
+	// 정규식 동작은 Go regexp로 대신 확인한다. POSIX 문자 클래스와 \m은 RE2와 문법이 달라서 바꿔 끼운다.
+	toRE2 := func(v string) *regexp.Regexp {
+		v = strings.ReplaceAll(v, sep, `[\s\p{P}\p{S}]*`)
+		v = strings.ReplaceAll(v, `\m`, `(?:^|[^\pL\pN])`)
+		return regexp.MustCompile("(?i)" + v)
+	}
+	for _, tc := range []struct {
+		q, name string
+		want    bool
+	}{
+		{"ss pop", "SS-POP 3", true},
+		{"sspop", "SS-POP 3", true},
+		{"ss-pop 3", "SS-POP 3", true},
+		{"dragon", "G-DRAGON", true},
+		{"ander", "wandering", false},
+		{"시간을달리는소년", "시간을 달리는 소년", true},
+		{"시간 소년", "시간을 달리는 소년", false},
+	} {
+		_, val := searchMatch(tc.q)
+		if got := toRE2(val).MatchString(tc.name); got != tc.want {
+			t.Errorf("%q vs %q = %v, want %v", tc.q, tc.name, got, tc.want)
 		}
 	}
 }
