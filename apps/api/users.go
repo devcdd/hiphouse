@@ -32,6 +32,7 @@ type PublicUser struct {
 	Nickname      string   `json:"nickname" db:"nickname"`
 	CreatedAt     string   `json:"created_at" db:"created_at"`
 	ProfilePublic bool     `json:"profile_public" db:"profile_public"`
+	AvatarURL     *string  `json:"avatar_url" db:"avatar_url"`
 	RatingCount   int      `json:"rating_count" db:"rating_count"`
 	RatingAvg     *float64 `json:"rating_avg" db:"rating_avg"`
 	CommentCount  int      `json:"comment_count" db:"comment_count"`
@@ -92,13 +93,13 @@ func (s *server) adminListUsers(w http.ResponseWriter, r *http.Request) {
 // id(비로그인이면 "")라 남에게는 절대 걸리지 않는다.
 const visibleToViewer = "(u.profile_public OR u.id = $2)"
 
-// publicUserSQL — 프로필 헤더. 닉네임과 가입일만 무조건 나가고, 활동 집계 셋은
+// publicUserSQL — 프로필 헤더. 닉네임, 프로필 이미지, 가입일만 무조건 나가고, 활동 집계 셋은
 // 전부 이 게이트 뒤에 있다. 남이 보는 비공개 프로필이면 count는 0, avg는 NULL.
 //
 // 댓글 자체는 앨범 페이지에 닉네임과 함께 계속 붙어 있다 (숨기면 남의 답글이 상대
 // 없이 남는다). 다만 "이 사람이 몇 개 썼는지"는 프로필 통계라 프로필을 닫으면 같이 닫는다.
 const publicUserSQL = `
-	SELECT u.id, u.nickname, u.profile_public,
+	SELECT u.id, u.nickname, u.profile_public, ` + avatarURLExpr + `,
 	       to_char(u.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
 	       CASE WHEN ` + visibleToViewer + `
 	            THEN (SELECT COUNT(*)::int FROM ratings rt WHERE rt.user_id = u.id)

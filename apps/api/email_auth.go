@@ -156,7 +156,7 @@ func (s *server) signupEmail(w http.ResponseWriter, r *http.Request) {
 	err = tx.QueryRow(ctx,
 		"INSERT INTO users(id,email,password_hash) VALUES($1,$2,$3) RETURNING "+userCols,
 		id, email, hash).
-		Scan(&u.ID, &u.Nickname, &u.Role, &u.ProfilePublic, &u.NicknameSet)
+		Scan(u.scanDest()...)
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		writeErr(w, 409, "이미 가입된 이메일입니다")
@@ -209,7 +209,7 @@ func (s *server) loginEmail(w http.ResponseWriter, r *http.Request) {
 	var hash *string
 	err := s.db.QueryRow(r.Context(),
 		"SELECT "+userCols+", password_hash FROM users WHERE email=$1", email).
-		Scan(&u.ID, &u.Nickname, &u.Role, &u.ProfilePublic, &u.NicknameSet, &hash)
+		Scan(append(u.scanDest(), &hash)...)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		writeErr(w, 500, err.Error())
 		return
@@ -264,7 +264,7 @@ func (s *server) resetPassword(w http.ResponseWriter, r *http.Request) {
 	err = tx.QueryRow(ctx,
 		"UPDATE users SET password_hash=$2 WHERE email=$1 AND password_hash IS NOT NULL RETURNING "+userCols,
 		email, hash).
-		Scan(&u.ID, &u.Nickname, &u.Role, &u.ProfilePublic, &u.NicknameSet)
+		Scan(u.scanDest()...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		writeErr(w, 404, "이메일로 가입된 계정이 없습니다")
 		return

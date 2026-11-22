@@ -83,6 +83,8 @@ func main() {
 	mux.HandleFunc("POST /auth/logout", s.logout)
 	mux.HandleFunc("GET /me", s.requireAuth(s.me))
 	mux.HandleFunc("PUT /me", s.requireAuth(s.updateMe))
+	mux.HandleFunc("PUT /me/avatar", s.requireAuth(s.putAvatar))
+	mux.HandleFunc("DELETE /me/avatar", s.requireAuth(s.deleteAvatar))
 	mux.HandleFunc("GET /me/wall", s.requireAuth(s.listMyWallPosts))
 	mux.HandleFunc("GET /me/artist-claim", s.requireAuth(s.getMyClaim))
 	mux.HandleFunc("PUT /me/artist-claim", s.requireAuth(s.putMyClaim))
@@ -91,6 +93,7 @@ func main() {
 	// 공개 프로필 — 닉네임/평가 통계와 평가한 앨범. 로그인 없이 열람 가능.
 	mux.HandleFunc("GET /users/{id}", s.getPublicUser)
 	mux.HandleFunc("GET /users/{id}/ratings", s.listPublicRatedAlbums)
+	mux.HandleFunc("GET /users/{id}/avatar", s.getAvatar)
 
 	// 링크 스크래퍼용 메타 프리렌더 (nginx가 봇 UA만 여기로 넘긴다)
 	mux.HandleFunc("GET /og/albums/{id}", s.ogAlbum)
@@ -264,6 +267,13 @@ func (s *server) ensureAuthSchema(ctx context.Context) error {
 		ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS email TEXT;
 		ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS password_hash TEXT;
 		CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users (email) WHERE email IS NOT NULL;
+		-- 프로필 이미지(avatar.go). users에는 avatar_url 버전용 시각만 두고 바이트는 따로 둔다.
+		ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS avatar_updated_at TIMESTAMPTZ;
+		CREATE TABLE IF NOT EXISTS user_avatars (
+			user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+			data BYTEA NOT NULL,
+			content_type TEXT NOT NULL
+		);
 		-- 이메일 인증 코드. 이메일·용도(signup/reset)마다 하나만 두고 재발송하면 덮어쓴다. 코드 원문은 저장하지 않는다.
 		CREATE TABLE IF NOT EXISTS email_codes (
 			email TEXT NOT NULL,

@@ -27,11 +27,17 @@ type User struct {
 	// NicknameSet is false until the user saves a nickname themselves; the web
 	// app uses it to show the first-login greeting + nickname setup.
 	NicknameSet bool `json:"nickname_set" db:"nickname_set"`
+	// AvatarURL은 API 기준 경로다(예: /users/123/avatar?v=...). 이미지가 없으면 null.
+	AvatarURL *string `json:"avatar_url" db:"avatar_url"`
 }
 
-// userCols is the shape every User scan expects; keep it in step with the Scan
-// argument order at each call site.
-const userCols = "id,nickname,role,profile_public,nickname_set"
+// userCols는 RETURNING에도 쓰여서 users 한 행만으로 계산되는 식만 넣을 수 있다.
+// 순서를 바꾸면 scanDest도 같이 바꾼다.
+const userCols = "id,nickname,role,profile_public,nickname_set," + avatarURLExpr
+
+func (u *User) scanDest() []any {
+	return []any{&u.ID, &u.Nickname, &u.Role, &u.ProfilePublic, &u.NicknameSet, &u.AvatarURL}
+}
 
 type ctxKey string
 
@@ -236,7 +242,7 @@ func (s *server) loginKakao(w http.ResponseWriter, r *http.Request) {
 
 	var u User
 	if err := s.db.QueryRow(r.Context(), "SELECT "+userCols+" FROM users WHERE id=$1", id).
-		Scan(&u.ID, &u.Nickname, &u.Role, &u.ProfilePublic, &u.NicknameSet); err != nil {
+		Scan(u.scanDest()...); err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
@@ -251,7 +257,7 @@ func (s *server) loginKakao(w http.ResponseWriter, r *http.Request) {
 func (s *server) me(w http.ResponseWriter, r *http.Request) {
 	var u User
 	if err := s.db.QueryRow(r.Context(), "SELECT "+userCols+" FROM users WHERE id=$1", currentUser(r).ID).
-		Scan(&u.ID, &u.Nickname, &u.Role, &u.ProfilePublic, &u.NicknameSet); err != nil {
+		Scan(u.scanDest()...); err != nil {
 		writeErr(w, 404, "user not found")
 		return
 	}
@@ -298,7 +304,7 @@ func (s *server) updateMe(w http.ResponseWriter, r *http.Request) {
 		"UPDATE users SET nickname=COALESCE($2,nickname), nickname_set=nickname_set OR $2 IS NOT NULL, "+
 			"profile_public=COALESCE($3,profile_public) WHERE id=$1 RETURNING "+userCols,
 		currentUser(r).ID, nick, body.ProfilePublic).
-		Scan(&u.ID, &u.Nickname, &u.Role, &u.ProfilePublic, &u.NicknameSet)
+		Scan(u.scanDest()...)
 	// 중복은 DB의 부분 유니크 인덱스가 잡는다. 미리 SELECT로 확인하면 확인과 UPDATE
 	// 사이에 남이 같은 이름을 채가는 경합이 남는다.
 	var pgErr *pgconn.PgError

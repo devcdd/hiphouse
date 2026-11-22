@@ -405,6 +405,7 @@
               "id": { "type": "string" }, "nickname": { "type": "string" },
               "created_at": { "type": "string", "format": "date-time" },
               "profile_public": { "type": "boolean", "description": "false = 주인이 프로필을 비공개로 설정. 남에게는 이 프로필의 활동 집계와 평가 목록이 전부 가려진다(주인 본인에게는 그대로 보인다). 팔로우·즐겨찾기는 공개 엔드포인트 자체가 없어 이 플래그와 무관하게 항상 비공개" },
+              "avatar_url": { "type": "string", "nullable": true, "description": "API 기준 프로필 이미지 경로(/users/{id}/avatar?v=...). 이미지가 없으면 null. 프로필 비공개와 상관없이 나간다" },
               "rating_count": { "type": "integer" },
               "rating_avg": { "type": "number", "nullable": true, "description": "별점 0..5. 평가가 없으면 null" },
               "comment_count": { "type": "integer" }
@@ -412,6 +413,40 @@
           },
           "404": { "$ref": "#/components/responses/NotFound" }
         }
+      }
+    },
+    "/users/{id}/avatar": {
+      "get": {
+        "tags": ["users"],
+        "summary": "프로필 이미지",
+        "description": "로그인 없이 조회 가능. v 쿼리가 있으면 1년 immutable 캐시를 건다. 이미지를 바꾸면 avatar_url의 v가 바뀐다.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "v", "in": "query", "schema": { "type": "string" }, "description": "캐시 무효화용 버전. avatar_url에 들어 있는 값을 그대로 쓴다" }
+        ],
+        "responses": {
+          "200": { "description": "이미지 바이트", "content": { "image/webp": {}, "image/jpeg": {}, "image/png": {} } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/me/avatar": {
+      "put": {
+        "tags": ["users"],
+        "summary": "내 프로필 이미지 올리기·바꾸기",
+        "description": "본문은 이미지 바이트 그대로 보낸다. WebP·JPEG·PNG만, 256KB 이하, 가로·세로 1024px 이하. 웹은 브라우저에서 256×256으로 줄여 보낸다. 성공하면 갱신된 User를 돌려준다.",
+        "requestBody": { "required": true, "content": { "image/webp": {}, "image/jpeg": {}, "image/png": {} } },
+        "responses": {
+          "200": { "description": "갱신된 User (avatar_url 포함)" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "413": { "description": "256KB 초과" }
+        }
+      },
+      "delete": {
+        "tags": ["users"],
+        "summary": "내 프로필 이미지 지우기",
+        "description": "이미지가 없어도 200. 갱신된 User(avatar_url=null)를 돌려준다.",
+        "responses": { "200": { "description": "갱신된 User" } }
       }
     },
     "/users/{id}/ratings": {
