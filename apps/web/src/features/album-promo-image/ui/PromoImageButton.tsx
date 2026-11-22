@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Download, Flame, LoaderCircle, X } from 'lucide-react'
+import { Dices, Download, Flame, LoaderCircle, X } from 'lucide-react'
 import { fetchAlbumTracks, type Album, type Track } from '@/entities/album'
 import { PROMO_BACKGROUNDS, promoFileName, renderPromoImages, type PromoOptions } from '../lib/renderPromoImage'
+import { FILM_STYLES, randomFilmSeed, type FilmStyle } from '../lib/shrinkWrap'
 import styles from './PromoImageButton.module.css'
 
 // 휴대폰에선 공유 시트로 여러 장을 한 번에 넘겨 인스타그램 캐러셀로 바로 올리고, 데스크톱에선 파일로 내려받는다.
@@ -38,10 +39,14 @@ export function PromoImageButton({ album, options }: { album: Album; options?: P
   const [previews, setPreviews] = useState<Preview[] | null>(null)
   // null이면 커버에서 뽑은 색을 쓴다.
   const [background, setBackground] = useState<string | null>(null)
+  // null이면 시드가 질감을 고른다.
+  const [film, setFilm] = useState<FilmStyle | null>(null)
+  // 배경색이나 질감만 바꿀 때는 주름이 그대로여야 비교할 수 있어서, 열 때와 다시 뽑을 때만 새로 정한다.
+  const filmSeed = useRef(0)
   const [rendering, setRendering] = useState(false)
   const dialog = useRef<HTMLDialogElement>(null)
   const tracks = useRef<Track[] | null>(null)
-  // 색을 연달아 바꾸면 늦게 끝난 이전 렌더가 화면을 덮어쓰지 않게 마지막 요청만 반영한다.
+  // 옵션을 연달아 바꾸면 늦게 끝난 이전 렌더가 화면을 덮어쓰지 않게 마지막 요청만 반영한다.
   const latest = useRef(0)
 
   useEffect(() => {
@@ -53,11 +58,15 @@ export function PromoImageButton({ album, options }: { album: Album; options?: P
 
   useEffect(() => () => previews?.forEach((p) => URL.revokeObjectURL(p.url)), [previews])
 
-  const render = async (bgId: string | null) => {
+  const render = async (bgId: string | null, filmStyle: FilmStyle | null) => {
     const req = ++latest.current
     tracks.current ??= await fetchAlbumTracks(album.id)
-    const rgb = PROMO_BACKGROUNDS.find((b) => b.id === bgId)?.rgb
-    const blobs = await renderPromoImages(album, tracks.current, { ...options, background: rgb })
+    const blobs = await renderPromoImages(album, tracks.current, {
+      ...options,
+      background: PROMO_BACKGROUNDS.find((b) => b.id === bgId)?.rgb,
+      film: filmStyle ?? undefined,
+      filmSeed: filmSeed.current,
+    })
     if (req !== latest.current) return
     setPreviews(
       blobs.map((b, i) => {
@@ -71,8 +80,9 @@ export function PromoImageButton({ album, options }: { album: Album; options?: P
 
   const open = async () => {
     setBusy(true)
+    filmSeed.current = randomFilmSeed()
     try {
-      await render(background)
+      await render(background, film)
     } catch (e) {
       fail(e)
     } finally {
@@ -80,17 +90,32 @@ export function PromoImageButton({ album, options }: { album: Album; options?: P
     }
   }
 
-  const pick = async (bgId: string | null) => {
-    if (bgId === background) return
-    setBackground(bgId)
+  const redraw = async (bgId: string | null, filmStyle: FilmStyle | null) => {
     setRendering(true)
     try {
-      await render(bgId)
+      await render(bgId, filmStyle)
     } catch (e) {
       fail(e)
     } finally {
       setRendering(false)
     }
+  }
+
+  const pick = (bgId: string | null) => {
+    if (bgId === background) return
+    setBackground(bgId)
+    redraw(bgId, film)
+  }
+
+  const pickFilm = (filmStyle: FilmStyle | null) => {
+    if (filmStyle === film) return
+    setFilm(filmStyle)
+    redraw(background, filmStyle)
+  }
+
+  const reroll = () => {
+    filmSeed.current = randomFilmSeed()
+    redraw(background, film)
   }
 
   const save = async () => {
@@ -137,6 +162,7 @@ export function PromoImageButton({ album, options }: { album: Album; options?: P
               </button>
             </div>
             <div className={styles.swatches} role="radiogroup" aria-label="배경색">
+              <span className={styles.rowLabel}>배경</span>
               <button
                 type="button"
                 role="radio"
@@ -160,6 +186,42 @@ export function PromoImageButton({ album, options }: { album: Album; options?: P
                 />
               ))}
               {rendering && <LoaderCircle size={16} className={styles.spin} />}
+            </div>
+            <div className={styles.swatches}>
+              <span className={styles.rowLabel}>비닐</span>
+              <div className={styles.films} role="radiogroup" aria-label="비닐 질감">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={film === null}
+                  className={`${styles.swatch} ${styles.auto}`}
+                  onClick={() => pickFilm(null)}
+                >
+                  랜덤
+                </button>
+                {FILM_STYLES.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={film === f.id}
+                    className={`${styles.swatch} ${styles.auto}`}
+                    onClick={() => pickFilm(f.id)}
+                  >
+                    {f.name}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className={styles.reroll}
+                onClick={reroll}
+                disabled={rendering}
+                aria-label="비닐 다시 뽑기"
+                title="비닐 다시 뽑기"
+              >
+                <Dices size={18} strokeWidth={2.2} />
+              </button>
             </div>
             <div className={styles.strip} data-rendering={rendering}>
               {previews.map((p, i) => (

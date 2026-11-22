@@ -1,7 +1,7 @@
 import type { Album, Track } from '@/entities/album'
 import { displayName } from '@/shared/lib/displayName'
 import { albumStats } from './albumStats'
-import { drawShrinkWrap, seedOf } from './shrinkWrap'
+import { drawShrinkWrap, randomFilmSeed, type FilmStyle } from './shrinkWrap'
 
 // 인스타그램 피드 세로형(4:5).
 const W = 1080
@@ -344,7 +344,7 @@ function newCanvas(): [HTMLCanvasElement, CanvasRenderingContext2D] {
 }
 
 // 커버를 바닥에 놓인 밀봉 LP처럼 그린다. 그림자로 띄우고 아트 위에 수축 필름을 씌운다.
-function drawJacket(ctx: CanvasRenderingContext2D, art: ImageBitmap, seed: number) {
+function drawJacket(ctx: CanvasRenderingContext2D, art: ImageBitmap, seed: number, film?: FilmStyle) {
   ctx.save()
   ctx.beginPath()
   ctx.roundRect(PAD, TOP, COVER, COVER, 3)
@@ -361,7 +361,7 @@ function drawJacket(ctx: CanvasRenderingContext2D, art: ImageBitmap, seed: numbe
   ctx.shadowColor = 'transparent'
   ctx.clip()
   ctx.drawImage(art, PAD, TOP, COVER, COVER)
-  drawShrinkWrap(ctx, PAD, TOP, COVER, seed)
+  drawShrinkWrap(ctx, PAD, TOP, COVER, seed, film)
   ctx.restore()
 }
 
@@ -381,7 +381,7 @@ function drawCover(
 ) {
   ctx.fillStyle = pal.bg
   ctx.fillRect(0, 0, W, H)
-  drawJacket(ctx, art, seedOf(album.id))
+  drawJacket(ctx, art, opts.filmSeed ?? randomFilmSeed(), opts.film)
   const date = album.release_date?.replaceAll('-', '.')
   if (opts.anniversaryYears) {
     drawSticker(ctx, `${ordinal(opts.anniversaryYears)} ANNIVERSARY`, `RELEASED ${date ?? ''}`)
@@ -551,6 +551,10 @@ export interface PromoOptions {
   anniversaryYears?: number
   // 없으면 커버에서 가장 눈에 띄는 색을 뽑아 쓴다.
   background?: RGB
+  // 비닐 질감. 없으면 filmSeed가 고른다.
+  film?: FilmStyle
+  // 주름 자리와 반사 띠 배치를 정한다. 없으면 그릴 때마다 새로 뽑는다.
+  filmSeed?: number
 }
 
 export async function renderPromoImages(album: Album, tracks: Track[], opts: PromoOptions = {}): Promise<Blob[]> {

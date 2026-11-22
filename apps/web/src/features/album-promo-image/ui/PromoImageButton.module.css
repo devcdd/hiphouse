@@ -111,6 +111,35 @@
   font-weight: 600;
 }
 
+.rowLabel {
+  width: 28px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.films {
+  display: contents;
+}
+
+.reroll {
+  display: inline-flex;
+  padding: 6px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.reroll:hover:not(:disabled) {
+  color: var(--fg);
+}
+
+.reroll:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* 여러 장이면 가로로 넘겨 보며 인스타그램 캐러셀 순서 그대로 확인한다. */
 .strip {
   display: flex;
