@@ -23,6 +23,11 @@
   line-height: 1.5;
 }
 
+.help a {
+  color: var(--fg);
+  font-weight: 600;
+}
+
 .status,
 .picked {
   display: flex;

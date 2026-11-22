@@ -97,7 +97,10 @@ export function ArtistClaimSection() {
         아티스트 본인입니다
       </label>
       <p className={styles.help}>
-        관리자가 확인한 뒤 실제 아티스트와 연결하면, 담벼락에 글을 쓸 때 이름이 아티스트명으로 강조됩니다.
+        <a href="https://www.instagram.com/hiphouse.kr/" target="_blank" rel="noreferrer">
+          @hiphouse.kr
+        </a>
+        에 인증 DM 보내주시면 빠른 확인이 가능합니다.
       </p>
 
       {claim && !editing && (
