@@ -14,3 +14,6 @@ dist/
 *.p8
 secrets/
 .claude/worktrees/
+
+# 홍보 포스터 결과물(marketing/posters/<버전>/)은 render*.mjs로 언제든 다시 만든다. shots/ 등 재료 이미지는 커밋한다.
+marketing/posters/[0-9]*/
