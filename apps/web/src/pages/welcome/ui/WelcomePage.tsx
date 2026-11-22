@@ -39,7 +39,7 @@ export function WelcomePage() {
       <h1 className={styles.greeting}>
         {user?.nickname ? `안녕하세요, ${user.nickname}님.` : '안녕하세요.'}
       </h1>
-      <p className={styles.lead}>힙하우스에서 쓸 닉네임을 정해주세요.</p>
+      <p className={styles.lead}>힙집에서 쓸 닉네임을 정해주세요.</p>
       <section className={styles.card}>
         <label className={styles.label} htmlFor="nickname">
           닉네임
