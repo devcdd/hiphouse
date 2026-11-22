@@ -3,6 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Google Tag Manager(GTM-N7HC2BFF). GA4(G-9BE66NGLR9)는 컨테이너 안에서 설정한다.
+         로컬 개발·미리보기 방문이 통계에 섞이지 않게 운영 도메인에서만 gtm.js를 불러온다. -->
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      if (/(^|\.)hiphouse\.kr$/.test(location.hostname)) {
+        var gtm = document.createElement('script');
+        gtm.async = true;
+        gtm.src = 'https://www.googletagmanager.com/gtm.js?id=GTM-N7HC2BFF';
+        document.head.appendChild(gtm);
+      }
+    </script>
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>힙집 HipHouse</title>
