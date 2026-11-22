@@ -39,9 +39,11 @@
   align-items: center;
 }
 
+/* logo.png는 정사각형이라 위아래 투명 여백을 잘라 예전 240×140 워드마크 크기로 보이게 한다. */
 .logo {
   height: 22px;
-  width: auto;
+  aspect-ratio: 12 / 7;
+  object-fit: cover;
   display: block;
 }
 
