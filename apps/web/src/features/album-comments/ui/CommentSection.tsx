@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { CornerDownRight, Pencil, Trash2 } from 'lucide-react'
+import { Pencil, Trash2 } from 'lucide-react'
 import { useAuth } from '@/entities/session'
 import { useStartSignIn } from '@/features/auth'
 import { apiUrl } from '@/shared/config'
@@ -17,7 +17,7 @@ import { CommentForm } from './CommentForm'
 import styles from './CommentSection.module.css'
 
 const fmt = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short' })
-// CommentSection.module.css의 --avatar-indent(아바타 + 간격)와 맞춘다.
+// CommentSection.module.css의 --avatar-indent(아바타 + 간격), 답글 세로선 위치(.reply)와 맞춘다.
 const AVATAR_SIZE = 24
 
 export function CommentSection({ albumId }: { albumId: string }) {
@@ -41,7 +41,6 @@ export function CommentSection({ albumId }: { albumId: string }) {
 
   const row = (c: Comment, isReply: boolean) => (
     <li key={c.id} className={isReply ? styles.reply : styles.comment}>
-      {isReply && <CornerDownRight size={14} className={styles.replyIcon} aria-hidden />}
       <div className={styles.body}>
         <div className={styles.meta}>
           {/* 삭제된 댓글은 작성자를 드러내지 않으므로 사진과 링크 없이 빈 원만 둔다. */}

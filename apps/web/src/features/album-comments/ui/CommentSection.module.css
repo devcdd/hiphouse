@@ -106,38 +106,46 @@
 }
 
 .list {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
+  /* 트랙 목록 같은 다른 목록의 구분선과 같은 농도다. */
+  --line: color-mix(in srgb, var(--fg) 8%, transparent);
 }
 
-.thread {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+/* 여백만으로는 댓글 사이가 글 한 줄 높이보다 좁아서 목록이 한 덩어리로 읽힌다. 스레드 사이를 선으로 나눈다. */
+.list > li {
+  padding: 18px 0;
 }
 
-.comment,
-.reply {
-  display: flex;
-  gap: 8px;
+.list > li:first-child {
+  padding-top: 0;
 }
 
-.reply {
-  margin-left: 22px;
+.list > li:last-child {
+  padding-bottom: 0;
 }
 
-.replyIcon {
-  flex: 0 0 auto;
-  margin-top: 2px;
-  color: var(--muted);
+.list > li + li {
+  border-top: 1px solid var(--line);
+}
+
+/* 세로선(2px)은 원댓글 아바타(24px) 가운데 아래에 긋고, 답글은 원댓글 본문 시작점(--avatar-indent)에 맞춘다. */
+.reply,
+.moreReplies,
+.replyForm {
+  margin-left: 11px;
+  padding: 14px 0 0 19px;
+  border-left: 2px solid var(--line);
+}
+
+/* 원댓글 바로 아래에서는 선을 조금 띄워 시작한다. 답글 없이 답글 폼만 열렸을 때도 같다. */
+.comment + li,
+.thread:has(> .comment:last-child) + .replyForm {
+  margin-top: 10px;
+  padding-top: 2px;
 }
 
 .body {
   /* 본문을 닉네임 시작점에 맞춘다. 아바타 24px(AVATAR_SIZE)과 .meta의 gap 8px을 더한 값이다. */
   --avatar-indent: 32px;
-  flex: 1 1 auto;
-  min-width: 0;
 }
 
 .content {
@@ -256,19 +264,10 @@
   color: var(--fg);
 }
 
-.replyForm {
-  margin: 12px 0 0 22px;
-}
-
 .state {
   color: var(--muted);
   font-size: 0.88rem;
   margin: 0;
-}
-
-/* 답글 줄의 본문 시작점에 맞춘다. .reply 들여쓰기 22px에 답글 아이콘 14px과 gap 8px을 더한 값이다. */
-.moreReplies {
-  margin-left: 44px;
 }
 
 .moreReplies .replyBtn {
