@@ -94,8 +94,15 @@
   border-radius: 8px;
   background: var(--bg);
   color: var(--fg);
+  font-family: inherit;
   font-size: 0.9rem;
   font-weight: 600;
+}
+
+.input::placeholder {
+  color: var(--muted);
+  font-weight: 400;
+  opacity: 0.8;
 }
 
 .input:focus {

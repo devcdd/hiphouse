@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { requestEmailCode, type EmailCodePurpose, type Session } from '@/entities/session'
+import { OtpInput } from '@/shared/ui/OtpInput'
 import { useToast } from '@/shared/ui/toast'
 import styles from './EmailCodeFlow.module.css'
 
@@ -97,31 +98,21 @@ export function EmailCodeFlow({ purpose, title, lead, passwordLabel, submitLabel
 
       {sentTo !== null && (
         <form className={styles.card} onSubmit={onFinish}>
-          <label className={styles.label} htmlFor="code-flow-code">
-            인증 코드
-          </label>
-          <div className={styles.row}>
-            <input
-              id="code-flow-code"
-              className={`${styles.input} ${styles.code}`}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              placeholder="6자리 숫자"
-              maxLength={6}
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              autoFocus
-            />
+          <div className={styles.labelRow}>
+            <label className={styles.label} htmlFor="code-flow-code">
+              인증 코드
+            </label>
             <button
               type="button"
-              className={styles.secondary}
+              className={styles.resend}
               disabled={waitSec > 0 || sendCode.isPending}
               onClick={() => sendCode.mutate(sentTo)}
             >
               {waitSec > 0 ? `다시 받기 ${waitSec}초` : '다시 받기'}
             </button>
           </div>
-          <p className={styles.hint}>메일이 안 보이면 스팸함도 확인해 주세요. 코드는 10분 동안 쓸 수 있어요.</p>
+          <OtpInput id="code-flow-code" value={code} onChange={setCode} autoFocus />
+          <p className={styles.hint}>메일이 안 보이면 스팸함도 확인해 주세요.</p>
 
           <label className={styles.label} htmlFor="code-flow-password">
             {passwordLabel}

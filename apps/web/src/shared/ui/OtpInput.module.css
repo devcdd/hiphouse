@@ -1,0 +1,68 @@
+.wrap {
+  position: relative;
+}
+
+/* 칸 위를 덮는 투명한 입력. 16px 미만이면 iOS Safari가 포커스할 때 화면을 확대한다. */
+.input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: transparent;
+  caret-color: transparent;
+  font-size: 16px;
+  opacity: 0;
+  cursor: text;
+}
+
+.boxes {
+  display: grid;
+  gap: 8px;
+}
+
+.box {
+  display: grid;
+  place-items: center;
+  height: 52px;
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--muted) 25%, transparent);
+  color: var(--fg);
+  font-size: 1.35rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  transition: box-shadow 0.12s;
+}
+
+.filled {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--muted) 45%, transparent);
+}
+
+.active {
+  box-shadow: inset 0 0 0 2px var(--fg);
+}
+
+.caret {
+  width: 2px;
+  height: 22px;
+  background: var(--fg);
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 380px) {
+  .boxes {
+    gap: 6px;
+  }
+
+  .box {
+    height: 46px;
+  }
+}
