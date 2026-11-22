@@ -1,4 +1,4 @@
-import { apiGet } from '@/shared/api/client'
+import { apiDelete, apiGet } from '@/shared/api/client'
 
 // Mirrors the Go `AdminUser` struct (apps/api/users.go).
 export interface AdminUser {
@@ -10,6 +10,7 @@ export interface AdminUser {
   comment_count: number
   favorite_count: number
   follow_count: number
+  delete_after: string | null // 탈퇴 신청 뒤 영구 삭제될 시각
 }
 
 export const USERS_PAGE_SIZE = 50
@@ -17,4 +18,9 @@ export const USERS_PAGE_SIZE = 50
 // 가입 최신순. q는 닉네임/카카오 ID 부분 일치.
 export function fetchAdminUsers(q: string, offset: number): Promise<AdminUser[]> {
   return apiGet<AdminUser[]>('/admin/users', { q, limit: USERS_PAGE_SIZE, offset })
+}
+
+// 유예 기간 없이 바로 영구 삭제한다. 자기 계정은 서버가 400으로 막는다.
+export function purgeAdminUser(id: string): Promise<void> {
+  return apiDelete<void>(`/admin/users/${encodeURIComponent(id)}`)
 }

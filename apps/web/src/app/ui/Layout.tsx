@@ -1,7 +1,7 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import { AppHeader } from '@/widgets/app-header'
 import { AppFooter } from '@/widgets/app-footer'
-import { useNicknameRedirect } from '@/features/auth'
+import { ReactivateDialog, useNicknameRedirect } from '@/features/auth'
 import { ScrollToTop } from '@/app/ui/ScrollToTop'
 import { ScrollTopButton } from '@/shared/ui/ScrollTopButton'
 import styles from './Layout.module.css'
@@ -19,6 +19,7 @@ export function Layout() {
       </main>
       <AppFooter />
       <ScrollTopButton />
+      <ReactivateDialog />
     </>
   )
 }

@@ -7,4 +7,6 @@ export interface User {
   nickname_set: boolean
   /** API 기준 프로필 이미지 경로. `apiUrl()`을 거쳐 `<img src>`에 넣는다. 이미지가 없으면 null. */
   avatar_url: string | null
+  /** 탈퇴 신청 뒤 영구 삭제될 시각(ISO 8601). 신청하지 않았으면 null. */
+  delete_after: string | null
 }

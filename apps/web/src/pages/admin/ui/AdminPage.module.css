@@ -897,3 +897,37 @@
 .claimGhost:hover {
   color: var(--fg);
 }
+
+.withdrawBadge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #d93636;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.purgeBtn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.purgeBtn:hover:not(:disabled) {
+  background: var(--bg);
+  color: #d93636;
+}
+
+.purgeBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

@@ -1,15 +1,18 @@
 import { useState } from 'react'
-import { useInfiniteQuery } from '@tanstack/react-query'
-import { Heart, MessageSquare, Search, Star, UserPlus, X } from 'lucide-react'
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Heart, MessageSquare, Search, Star, Trash2, UserPlus, X } from 'lucide-react'
 import { Avatar } from '@/shared/ui/Avatar'
 import { useDebouncedValue } from '@/shared/lib/useDebouncedValue'
-import { fetchAdminUsers, USERS_PAGE_SIZE } from '../api/usersAdminApi'
+import { formatDeleteAfter, useAuth } from '@/entities/session'
+import { useToast } from '@/shared/ui/toast'
+import { fetchAdminUsers, purgeAdminUser, USERS_PAGE_SIZE } from '../api/usersAdminApi'
+import type { AdminUser } from '../api/usersAdminApi'
 import styles from './AdminPage.module.css'
 
 const nf = new Intl.NumberFormat('ko-KR')
 const df = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium' })
 
-// 가입 최신순 회원 목록. 보기 전용 — 계정 조작(정지·삭제)은 여기에 없다.
+// 가입 최신순 회원 목록. 조작은 즉시 영구 삭제 하나뿐이다(탈퇴 유예 기간을 건너뛴다).
 export function UsersTab() {
   const [input, setInput] = useState('')
   const q = useDebouncedValue(input.trim(), 300)
@@ -22,6 +25,20 @@ export function UsersTab() {
       last.length < USERS_PAGE_SIZE ? undefined : pages.length * USERS_PAGE_SIZE,
   })
   const users = data?.pages.flat() ?? []
+  const { user: me } = useAuth()
+  const qc = useQueryClient()
+  const toast = useToast()
+  const purge = useMutation({
+    mutationFn: (u: AdminUser) => purgeAdminUser(u.id),
+    onSuccess: (_r, u) => {
+      qc.invalidateQueries({ queryKey: ['admin-users'] })
+      toast(`${u.nickname || u.id} 회원을 삭제했습니다`)
+    },
+    onError: (e: Error) => toast(e.message || '회원 삭제에 실패했습니다', 'error'),
+  })
+  const confirmPurge = (u: AdminUser) => {
+    if (window.confirm(`${u.nickname || u.id} 회원과 활동 기록을 지금 영구 삭제할까요? 되돌릴 수 없습니다.`)) purge.mutate(u)
+  }
 
   return (
     <div className={styles.aliasWrap}>
@@ -53,6 +70,9 @@ export function UsersTab() {
               <span className={styles.rowName} title={u.nickname}>
                 {u.nickname || '(닉네임 없음)'}
                 {u.role === 'admin' && <span className={styles.roleBadge}>관리자</span>}
+                {u.delete_after && (
+                  <span className={styles.withdrawBadge}>{formatDeleteAfter(u.delete_after)} 삭제 예정</span>
+                )}
               </span>
               <span className={styles.rowId} title={u.id}>
                 {u.id} · {df.format(new Date(u.created_at))} 가입
@@ -76,6 +96,18 @@ export function UsersTab() {
                 {nf.format(u.follow_count)}
               </span>
             </div>
+            {u.id !== me?.id && (
+              <button
+                type="button"
+                className={styles.purgeBtn}
+                disabled={purge.isPending}
+                onClick={() => confirmPurge(u)}
+                title="즉시 영구 삭제"
+                aria-label={`${u.nickname || u.id} 즉시 영구 삭제`}
+              >
+                <Trash2 size={15} />
+              </button>
+            )}
           </div>
         ))}
       </div>
