@@ -217,10 +217,9 @@ function Bubble({
   onDelete: () => void
 }) {
   const verified = post.artist_id != null
-  const name = verified ? post.artist_name || post.nickname : post.nickname || '익명'
-  const nameHref = verified
-    ? `/artists/${encodeURIComponent(post.artist_id!)}`
-    : `/users/${encodeURIComponent(post.user_id)}`
+  // 아티스트 본인도 본인이 정한 닉네임으로 보인다. 인증 여부는 배지와 title로만 알린다.
+  const name = post.nickname || '익명'
+  const nameHref = `/users/${encodeURIComponent(post.user_id)}`
   const cls = [styles.msg, owner ? styles.left : styles.right, continued && styles.continued]
     .filter(Boolean)
     .join(' ')
@@ -237,7 +236,7 @@ function Bubble({
           <Link
             to={nameHref}
             className={verified ? `${styles.nick} ${styles.verified}` : styles.nick}
-            title={verified ? `인증된 아티스트 (${post.nickname})` : undefined}
+            title={verified ? `인증된 아티스트 ${post.artist_name ?? ''}`.trim() : undefined}
           >
             {name}
             {verified && <BadgeCheck size={13} strokeWidth={2.4} aria-label="인증된 아티스트" />}
