@@ -40,26 +40,26 @@ const artistCols = "id,name,display_name,image_url,genres,spotify_url,aliases,fo
 const artistSelectCols = artistCols +
 	",(SELECT COUNT(*) FROM follows fl WHERE fl.artist_id=artists.id)::int AS follower_count"
 
+// buildArtistListQuery is pure so it can be unit-tested without a DB.
+// q matches the artist name, the 한글 표시 이름, OR any admin-curated alias
+// (연관검색어), so a Korean query finds artists stored under an English name.
+// 매칭 규칙은 앨범 검색과 같다(searchMatch). 이름이 잘 맞은 순서로 세운다.
+func buildArtistListQuery(q string, limit, offset int) (string, []any) {
+	var args []any
+	sql := "SELECT " + artistSelectCols + " FROM artists"
+	// Sort by what the UI actually shows (한글명이 있으면 그 이름).
+	order := "COALESCE(display_name, name)"
+	if q != "" {
+		sql = artistHitsCTE(q, &args) + " " + sql + " JOIN hit ON hit.artist_id = artists.id"
+		order = "hit.rank, hit.own DESC, " + order
+	}
+	args = append(args, limit, offset)
+	return sql + " ORDER BY " + order + " LIMIT $" + strconv.Itoa(len(args)-1) + " OFFSET $" + strconv.Itoa(len(args)), args
+}
+
 func (s *server) listArtists(w http.ResponseWriter, r *http.Request) {
 	limit, offset := clampPage(r)
-	sql := "SELECT " + artistSelectCols + " FROM artists WHERE 1=1"
-	var args []any
-	// q matches the artist name, the 한글 표시 이름, OR any admin-curated alias
-	// (연관검색어), so a Korean query finds artists stored under an English name.
-	if q := r.URL.Query().Get("q"); q != "" {
-		// Same matching rules as the album search (word-start for Latin queries,
-		// infix for 한글) — see searchMatch.
-		op, val := searchMatch(q)
-		args = append(args, val)
-		p := "$" + strconv.Itoa(len(args))
-		sql += " AND (name" + op + p + " OR display_name" + op + p +
-			" OR EXISTS (SELECT 1 FROM unnest(COALESCE(aliases,'{}'::text[])) AS al WHERE al" + op + p + "))"
-	}
-	args = append(args, limit)
-	// Sort by what the UI actually shows (한글명이 있으면 그 이름).
-	sql += " ORDER BY COALESCE(display_name, name) LIMIT $" + strconv.Itoa(len(args))
-	args = append(args, offset)
-	sql += " OFFSET $" + strconv.Itoa(len(args))
+	sql, args := buildArtistListQuery(r.URL.Query().Get("q"), limit, offset)
 	rows, err := s.db.Query(r.Context(), sql, args...)
 	if err != nil {
 		writeErr(w, 500, err.Error())

@@ -33,11 +33,14 @@ func TestAlbumArtistsJSON(t *testing.T) {
 }
 
 func TestBuildAlbumListQuery(t *testing.T) {
-	// year + artist filters present: placeholders must be $1..$4 in order.
+	// year + artist filters present: placeholders must be $1..$7 in order.
 	y := 2024
 	// Multi-type (single OR ep): predicates inlined (no args), so placeholders stay year/artist/q + limit/offset.
+	// 검색어는 패턴 셋(부분 일치, 통째 일치, 앞부분 일치)으로 들어간다.
 	sql, args := buildAlbumListQuery(&y, "abc", "dre", []string{"single", "ep"}, "tracks", "hide", false, 10, 5)
-	if _, q := searchMatch("dre"); !eq(args, []any{2024, "abc", q, 10, 5}) {
+	_, match := searchMatch("dre")
+	exact, prefix := searchAnchors(match)
+	if !eq(args, []any{2024, "abc", match, exact, prefix, 10, 5}) {
 		t.Fatalf("args = %v", args)
 	}
 	for _, frag := range []string{
@@ -49,7 +52,7 @@ func TestBuildAlbumListQuery(t *testing.T) {
 		"ar.name ~* $3", "ar.display_name ~* $3", "al ~* $3",
 		"t.name ~* $3", "t.display_name ~* $3",
 		typeCond("single"), typeCond("ep"), " OR ",
-		"total_tracks DESC", "LIMIT $4", "OFFSET $5",
+		"total_tracks DESC", "LIMIT $6", "OFFSET $7",
 	} {
 		if !strings.Contains(sql, frag) {
 			t.Errorf("missing %q in %s", frag, sql)
@@ -61,15 +64,27 @@ func TestBuildAlbumListQuery(t *testing.T) {
 	}
 	// Two-phase: filters/sort/LIMIT run on an id-only inner query, and the outer
 	// one (the expensive artists json_agg) sorts the surviving page again.
-	if !strings.Contains(sql, "WHERE id IN (SELECT id FROM albums") {
-		t.Errorf("expected the id-only inner query: %s", sql)
+	// 검색은 바깥 정렬에도 순위가 필요해서 안쪽 쿼리를 JOIN으로 붙인다.
+	if strings.Count(sql, "JOIN hit ON hit.album_id = albums.id") != 1 || !strings.Contains(sql, ") hit ON hit.album_id = albums.id ORDER BY") {
+		t.Errorf("expected the ranked inner query joined twice: %s", sql)
 	}
 	if strings.Count(sql, "total_tracks DESC") != 2 {
 		t.Errorf("both phases must carry the same ORDER BY: %s", sql)
 	}
-	// 검색어가 있으면 수상작이 먼저 — 두 단계 모두 같은 ORDER BY를 써야 한다.
-	if strings.Count(sql, "ORDER BY EXISTS (SELECT 1 FROM awards aw WHERE aw.album_id = albums.id) DESC, ") != 2 {
-		t.Errorf("search should rank awarded albums first in both phases: %s", sql)
+	// 검색어가 있으면 이름이 잘 맞은 순위가 먼저고 그다음이 수상작이다. 두 단계 모두 같은 ORDER BY를 써야 한다.
+	if strings.Count(sql, "ORDER BY hit.rank, EXISTS (SELECT 1 FROM awards aw WHERE aw.album_id = albums.id) DESC, ") != 2 {
+		t.Errorf("search should order by rank then awarded in both phases: %s", sql)
+	}
+	// 앨범 이름, 아티스트 이름, 수록곡 이름이 통째로 맞았는지에 따라 순위가 갈린다.
+	for _, frag := range []string{
+		"CASE WHEN albums.name ~* $4 OR albums.display_name ~* $4 THEN 0 WHEN albums.name ~* $5 OR albums.display_name ~* $5 THEN 2 ELSE 5 END",
+		"CASE WHEN ar.name ~* $4",
+		"CASE WHEN t.name ~* $4 OR t.display_name ~* $4 THEN 4",
+		"SELECT album_id, min(rank) AS rank FROM matched GROUP BY album_id",
+	} {
+		if !strings.Contains(sql, frag) {
+			t.Errorf("missing %q in %s", frag, sql)
+		}
 	}
 	// The aggregates are plain columns now — no per-row subqueries left.
 	if strings.Contains(sql, "FROM ratings") || strings.Contains(sql, "FROM comments") {
@@ -86,6 +101,9 @@ func TestBuildAlbumListQuery(t *testing.T) {
 	}
 	if !strings.Contains(sql, "release_date DESC NULLS LAST") {
 		t.Errorf("default sort should be by release_date: %s", sql)
+	}
+	if !strings.Contains(sql, "WHERE id IN (SELECT id FROM albums") || strings.Contains(sql, "hit") {
+		t.Errorf("no search query → id-only inner query, no ranking: %s", sql)
 	}
 	// admin browsing ("include") must NOT filter deleted_at either way.
 	// (albums.-qualified: the comment_count subquery filters its own deleted_at.)

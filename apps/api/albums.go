@@ -199,38 +199,31 @@ func albumDeletedMode(isAdmin bool, param string) string {
 // ≤limit rows that survived. Searching a common word used to aggregate every
 // match before LIMIT threw them away.
 func buildAlbumListQuery(year *int, artistID, q string, types []string, sort string, deleted string, awarded bool, limit, offset int) (string, []any) {
-	sql := "SELECT id FROM albums WHERE 1=1"
+	where := " WHERE 1=1"
 	// Qualified with albums. — the EXISTS subqueries have their own columns.
 	switch deleted {
 	case "include": // no filter
 	case "only":
-		sql += " AND albums.deleted_at IS NOT NULL"
+		where += " AND albums.deleted_at IS NOT NULL"
 	default: // "hide"
-		sql += " AND albums.deleted_at IS NULL"
+		where += " AND albums.deleted_at IS NULL"
 	}
 	var args []any
 	if year != nil {
 		args = append(args, *year)
-		sql += " AND year = $" + strconv.Itoa(len(args))
+		where += " AND year = $" + strconv.Itoa(len(args))
 	}
 	if artistID != "" {
 		args = append(args, artistID)
-		sql += " AND EXISTS (SELECT 1 FROM album_artists aa WHERE aa.album_id = albums.id AND aa.artist_id = $" + strconv.Itoa(len(args)) + ")"
+		where += " AND EXISTS (SELECT 1 FROM album_artists aa WHERE aa.album_id = albums.id AND aa.artist_id = $" + strconv.Itoa(len(args)) + ")"
 	}
 	// q matches the album name (English or the 한글 display name), a credited
 	// artist's name (both spellings too), any admin-curated alias (연관검색어) —
 	// so "블랙넛" finds albums stored under "Black Nut" — or a track name (원본명
 	// 또는 한글 표시 이름), so searching a song title surfaces its album.
+	hits := ""
 	if q != "" {
-		op, val := searchMatch(q)
-		args = append(args, val)
-		p := "$" + strconv.Itoa(len(args))
-		sql += " AND (albums.name" + op + p + " OR albums.display_name" + op + p +
-			" OR EXISTS (SELECT 1 FROM album_artists aa JOIN artists ar ON ar.id = aa.artist_id" +
-			" WHERE aa.album_id = albums.id AND (ar.name" + op + p + " OR ar.display_name" + op + p +
-			" OR EXISTS (SELECT 1 FROM unnest(COALESCE(ar.aliases,'{}'::text[])) AS al WHERE al" + op + p + ")))" +
-			" OR EXISTS (SELECT 1 FROM tracks t WHERE t.album_id = albums.id AND (t.name" + op + p +
-			" OR t.display_name" + op + p + ")))"
+		hits = albumHitsCTE(q, &args)
 	}
 	// Multi-select album types combine with OR. Empty = no filter (전체).
 	var conds []string
@@ -240,24 +233,28 @@ func buildAlbumListQuery(year *int, artistID, q string, types []string, sort str
 		}
 	}
 	if len(conds) > 0 {
-		sql += " AND (" + strings.Join(conds, " OR ") + ")"
+		where += " AND (" + strings.Join(conds, " OR ") + ")"
 	}
 	if awarded {
-		sql += " AND " + awardedExpr
+		where += " AND " + awardedExpr
 	}
 	order := orderClause(sort)
-	// 검색에선 수상작을 위로 — 이름만 스쳐 맞은 앨범보다 찾던 앨범일 확률이 높다.
+	// 검색에선 이름이 잘 맞은 순서가 먼저다. 같은 순위에서는 수상작을 위로 올린다. 이름만 스쳐 맞은
+	// 앨범보다 찾던 앨범일 확률이 높다.
 	if q != "" {
-		order = awardedExpr + " DESC, " + order
+		order = "hit.rank, " + awardedExpr + " DESC, " + order
 	}
-	sql += " ORDER BY " + order
-	args = append(args, limit)
-	sql += " LIMIT $" + strconv.Itoa(len(args))
-	args = append(args, offset)
-	sql += " OFFSET $" + strconv.Itoa(len(args))
-	// IN (...) doesn't preserve the inner order, so the outer query sorts again —
-	// over at most `limit` rows.
-	return "SELECT " + albumSelectCols + " FROM albums WHERE id IN (" + sql + ") ORDER BY " + order, args
+	args = append(args, limit, offset)
+	page := where + " ORDER BY " + order + " LIMIT $" + strconv.Itoa(len(args)-1) + " OFFSET $" + strconv.Itoa(len(args))
+	if q == "" {
+		// IN (...) doesn't preserve the inner order, so the outer query sorts again —
+		// over at most `limit` rows.
+		return "SELECT " + albumSelectCols + " FROM albums WHERE id IN (SELECT id FROM albums" + page + ") ORDER BY " + order, args
+	}
+	// 검색은 바깥 정렬에도 순위가 필요해서 IN 대신 JOIN으로 순위를 들고 나온다.
+	return "SELECT " + albumSelectCols + " FROM albums JOIN (" + hits +
+		" SELECT albums.id AS album_id, hit.rank FROM albums JOIN hit ON hit.album_id = albums.id" + page +
+		") hit ON hit.album_id = albums.id ORDER BY " + order, args
 }
 
 func (a *Album) validate() string {

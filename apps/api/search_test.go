@@ -63,3 +63,58 @@ func TestSearchMatchChosung(t *testing.T) {
 		}
 	}
 }
+
+func TestSearchAnchors(t *testing.T) {
+	for _, tc := range []struct {
+		q, name       string
+		exact, prefix bool
+	}{
+		{"nowitzki", "NOWITZKI", true, true},
+		{"sweat", "SWEAT (Prod. JINBO)", true, true},
+		{"24:26", "24:26 (5th Anniversary Remaster Edition)", true, true},
+		{"ss pop", "SS-POP 3", false, true},
+		{"sspop3", "SS-POP 3", true, true},
+		{"빈지노", "빈지노", true, true},
+		{"사랑", "사랑은 은하수 다방에서", false, true},
+		{"심야", "김심야", false, false},
+		// \m은 단어 시작이면 어디서든 맞지만 순위는 이름 맨 앞에서만 올린다.
+		{"dragon", "G-DRAGON", false, false},
+		{"ㅂㅈㄴ", "빈지노", true, true},
+		{"!!!", "!!!", true, true},
+	} {
+		_, match := searchMatch(tc.q)
+		exact, prefix := searchAnchors(match)
+		if got := pgToRE2(t, exact).MatchString(tc.name); got != tc.exact {
+			t.Errorf("exact %q vs %q = %v, want %v", tc.q, tc.name, got, tc.exact)
+		}
+		if got := pgToRE2(t, prefix).MatchString(tc.name); got != tc.prefix {
+			t.Errorf("prefix %q vs %q = %v, want %v", tc.q, tc.name, got, tc.prefix)
+		}
+	}
+}
+
+func TestBuildArtistListQuery(t *testing.T) {
+	sql, args := buildArtistListQuery("", 20, 40)
+	if !eq(args, []any{20, 40}) || !strings.HasSuffix(sql, "FROM artists ORDER BY COALESCE(display_name, name) LIMIT $1 OFFSET $2") {
+		t.Errorf("no query: %v %s", args, sql)
+	}
+
+	sql, args = buildArtistListQuery("dre", 20, 0)
+	_, match := searchMatch("dre")
+	exact, prefix := searchAnchors(match)
+	if !eq(args, []any{match, exact, prefix, 20, 0}) {
+		t.Fatalf("args = %v", args)
+	}
+	for _, frag := range []string{
+		// 이름, 한글 표시 이름, 연관검색어를 모두 본다.
+		"WHERE ar.name ~* $1 OR ar.display_name ~* $1 OR EXISTS (SELECT 1 FROM unnest(COALESCE(ar.aliases,'{}'::text[])) AS al WHERE al ~* $1)",
+		"CASE WHEN ar.name ~* $2", "THEN 1 WHEN ar.name ~* $3", "THEN 3 ELSE 5 END AS rank",
+		// 연관검색어로만 맞은 아티스트는 제 이름으로 맞은 아티스트 뒤에 온다.
+		"(ar.name ~* $1 OR ar.display_name ~* $1) IS TRUE AS own",
+		"JOIN hit ON hit.artist_id = artists.id ORDER BY hit.rank, hit.own DESC, COALESCE(display_name, name) LIMIT $4 OFFSET $5",
+	} {
+		if !strings.Contains(sql, frag) {
+			t.Errorf("missing %q in %s", frag, sql)
+		}
+	}
+}
