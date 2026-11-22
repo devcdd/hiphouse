@@ -30,12 +30,12 @@ type Comment struct {
 // oldest-first both between threads and inside one).
 func (s *server) listComments(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.db.Query(r.Context(), `
-		SELECT c.id, c.parent_id, c.user_id, u.nickname,
+		SELECT c.id, c.parent_id, COALESCE(c.user_id, '') AS user_id, COALESCE(u.nickname, '') AS nickname,
 		       CASE WHEN c.deleted_at IS NULL THEN c.body ELSE '' END AS body,
 		       to_char(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
 		       (c.deleted_at IS NOT NULL) AS deleted,
 		       (c.edited_at IS NOT NULL) AS edited
-		FROM comments c JOIN users u ON u.id = c.user_id
+		FROM comments c LEFT JOIN users u ON u.id = c.user_id
 		WHERE c.album_id = $1
 		  AND (c.deleted_at IS NULL
 		       OR EXISTS (SELECT 1 FROM comments rp WHERE rp.parent_id = c.id AND rp.deleted_at IS NULL))

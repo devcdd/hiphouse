@@ -83,6 +83,7 @@ func main() {
 	mux.HandleFunc("POST /auth/logout", s.logout)
 	mux.HandleFunc("GET /me", s.requireAuth(s.me))
 	mux.HandleFunc("PUT /me", s.requireAuth(s.updateMe))
+	mux.HandleFunc("DELETE /me", s.requireAuth(s.withdraw))
 	mux.HandleFunc("PUT /me/avatar", s.requireAuth(s.putAvatar))
 	mux.HandleFunc("DELETE /me/avatar", s.requireAuth(s.deleteAvatar))
 	mux.HandleFunc("GET /me/wall", s.requireAuth(s.listMyWallPosts))
@@ -328,12 +329,22 @@ func (s *server) ensureAuthSchema(ctx context.Context) error {
 		CREATE TABLE IF NOT EXISTS comments (
 			id BIGSERIAL PRIMARY KEY,
 			album_id TEXT NOT NULL,
-			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
 			parent_id BIGINT REFERENCES comments(id) ON DELETE CASCADE,
 			body TEXT NOT NULL,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			deleted_at TIMESTAMPTZ
 		);
+		-- 탈퇴(withdraw)로 users 행이 지워져도 남의 답글이 달린 댓글은 삭제 표시로 남아야 한다.
+		-- CASCADE였던 기존 DB만 한 번 바꾼다. 매 부팅마다 FK를 다시 걸면 테이블 전체 검증이 돈다.
+		DO $mig$ BEGIN
+			IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'comments_user_id_fkey' AND confdeltype = 'c') THEN
+				ALTER TABLE comments ALTER COLUMN user_id DROP NOT NULL;
+				ALTER TABLE comments DROP CONSTRAINT comments_user_id_fkey;
+				ALTER TABLE comments ADD CONSTRAINT comments_user_id_fkey
+					FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL;
+			END IF;
+		END $mig$;
 		CREATE INDEX IF NOT EXISTS idx_comments_album ON comments(album_id, id);
 		CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_id);
 		ALTER TABLE IF EXISTS comments ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ;
