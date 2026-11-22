@@ -133,6 +133,7 @@ func main() {
 
 	// Comments — reads public, writing/deleting requires auth
 	mux.HandleFunc("GET /albums/{id}/comments", s.listComments)
+	mux.HandleFunc("GET /comments/{id}/replies", s.listReplies)
 	mux.HandleFunc("POST /albums/{id}/comments", s.requireAuth(s.addComment))
 	mux.HandleFunc("PUT /comments/{id}", s.requireAuth(s.updateComment))
 	mux.HandleFunc("DELETE /comments/{id}", s.requireAuth(s.deleteComment))

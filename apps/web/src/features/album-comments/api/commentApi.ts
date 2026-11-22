@@ -12,8 +12,33 @@ export interface Comment {
   edited: boolean
 }
 
-export const fetchComments = (albumId: string): Promise<Comment[]> =>
-  apiGet<Comment[]>(`/albums/${encodeURIComponent(albumId)}/comments`)
+// 최상위 댓글과 앞쪽 답글 미리보기. reply_count가 replies보다 크면 나머지는 fetchReplies로 받는다.
+export interface CommentThread extends Comment {
+  reply_count: number
+  replies: Comment[]
+}
+
+export interface CommentPage {
+  threads: CommentThread[]
+  next_cursor: number | null
+  total: number // 답글을 포함한 살아 있는 댓글 수
+}
+
+export interface ReplyPage {
+  replies: Comment[]
+  next_cursor: number | null
+}
+
+export const COMMENT_PAGE_SIZE = 10
+
+export const fetchComments = (albumId: string, before: number | null): Promise<CommentPage> =>
+  apiGet<CommentPage>(`/albums/${encodeURIComponent(albumId)}/comments`, {
+    limit: COMMENT_PAGE_SIZE,
+    before: before ?? undefined,
+  })
+
+export const fetchReplies = (commentId: number, after: number | null): Promise<ReplyPage> =>
+  apiGet<ReplyPage>(`/comments/${commentId}/replies`, { limit: COMMENT_PAGE_SIZE, after: after ?? undefined })
 
 export const addComment = (albumId: string, body: string, parentId?: number) =>
   apiPost<Comment>(`/albums/${encodeURIComponent(albumId)}/comments`, { body, parent_id: parentId ?? null })

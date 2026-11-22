@@ -265,3 +265,32 @@
   font-size: 0.88rem;
   margin: 0;
 }
+
+/* 답글 줄의 본문 시작점에 맞춘다. .reply 들여쓰기 22px에 답글 아이콘 14px과 gap 8px을 더한 값이다. */
+.moreReplies {
+  margin-left: 44px;
+}
+
+.moreReplies .replyBtn {
+  margin-top: 0;
+}
+
+.more {
+  align-self: center;
+  padding: 10px 22px;
+  border: none;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.more:hover:not(:disabled) {
+  color: var(--fg);
+}
+
+.more:disabled {
+  cursor: default;
+}

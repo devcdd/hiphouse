@@ -1,39 +1,37 @@
 import { useMemo } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   fetchComments,
+  fetchReplies,
   addComment,
   editComment,
   removeComment,
-  type Comment,
 } from '@/features/album-comments/api/commentApi'
 import { useToast } from '@/shared/ui/toast'
 
-export interface Thread {
-  comment: Comment
-  replies: Comment[]
+export function useComments(albumId: string) {
+  const { data, ...rest } = useInfiniteQuery({
+    queryKey: ['comments', albumId],
+    queryFn: ({ pageParam }) => fetchComments(albumId, pageParam),
+    initialPageParam: null as number | null,
+    getNextPageParam: (last) => last.next_cursor,
+  })
+  const threads = useMemo(() => data?.pages.flatMap((p) => p.threads) ?? [], [data])
+  return { threads, count: data?.pages[0]?.total ?? 0, ...rest }
 }
 
-export function useComments(albumId: string) {
-  const { data, ...rest } = useQuery({
-    queryKey: ['comments', albumId],
-    queryFn: () => fetchComments(albumId),
+// 미리보기 뒤의 답글. 키에 after를 넣어서 미리보기가 바뀌면(답글 삭제 등) 새 커서로 다시 받는다.
+// ['comments', albumId] 아래에 두어 댓글 변경 시 같이 무효화된다.
+export function useMoreReplies(albumId: string, commentId: number, after: number | null, enabled: boolean) {
+  const { data, ...rest } = useInfiniteQuery({
+    queryKey: ['comments', albumId, 'replies', commentId, after],
+    queryFn: ({ pageParam }) => fetchReplies(commentId, pageParam),
+    initialPageParam: after,
+    getNextPageParam: (last) => last.next_cursor,
+    enabled,
   })
-
-  // The API returns a flat list ordered thread-by-thread; nest it for rendering.
-  const threads = useMemo<Thread[]>(() => {
-    const roots = (data ?? []).filter((c) => c.parent_id === null)
-    const byParent = new Map<number, Comment[]>()
-    for (const c of data ?? []) {
-      if (c.parent_id === null) continue
-      const list = byParent.get(c.parent_id)
-      if (list) list.push(c)
-      else byParent.set(c.parent_id, [c])
-    }
-    return roots.map((comment) => ({ comment, replies: byParent.get(comment.id) ?? [] }))
-  }, [data])
-
-  return { threads, count: (data ?? []).filter((c) => !c.deleted).length, ...rest }
+  const replies = useMemo(() => data?.pages.flatMap((p) => p.replies) ?? [], [data])
+  return { replies, ...rest }
 }
 
 export function useAddComment(albumId: string) {

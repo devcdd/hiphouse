@@ -26,36 +26,157 @@ type Comment struct {
 	Edited    bool    `json:"edited" db:"edited"`
 }
 
-// listComments is public. Deleted comments survive only as tombstones for their
-// still-live replies; a deleted comment with nothing under it disappears.
-// Ordering groups each thread by its root (ids are monotonic, so this is
-// oldest-first both between threads and inside one).
+const (
+	commentPageSize   = 10
+	commentPageMax    = 50
+	replyPreviewCount = 3 // 스레드마다 첫 페이지에 같이 싣는 답글 수. 나머지는 listReplies로 더 불러온다.
+)
+
+const commentCols = `c.id, c.parent_id, COALESCE(c.user_id, '') AS user_id, COALESCE(u.nickname, '') AS nickname,
+	(SELECT ` + avatarURLExpr + ` FROM users au WHERE au.id = c.user_id) AS avatar_url,
+	CASE WHEN c.deleted_at IS NULL THEN c.body ELSE '' END AS body,
+	to_char(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
+	(c.deleted_at IS NOT NULL) AS deleted,
+	(c.edited_at IS NOT NULL) AS edited`
+
+// commentThread는 최상위 댓글 하나와 앞쪽 답글 미리보기다. ReplyCount는 살아 있는 답글 전체 수라서
+// Replies보다 크면 화면에 답글 더 보기 버튼이 붙는다.
+type commentThread struct {
+	Comment
+	ReplyCount int       `json:"reply_count" db:"reply_count"`
+	Replies    []Comment `json:"replies" db:"-"`
+}
+
+type commentPage struct {
+	Threads    []commentThread `json:"threads"`
+	NextCursor *int64          `json:"next_cursor"`
+	Total      int             `json:"total"` // 이 앨범의 살아 있는 댓글 수(답글 포함)
+}
+
+type replyPage struct {
+	Replies    []Comment `json:"replies"`
+	NextCursor *int64    `json:"next_cursor"`
+}
+
+func commentLimit(r *http.Request) int {
+	n := queryInt(r, "limit", commentPageSize)
+	if n < 1 || n > commentPageMax {
+		return commentPageSize
+	}
+	return n
+}
+
+// listComments는 공개 API다. 최상위 댓글을 최신순으로 ?before=<id> 커서마다 limit개씩 주고,
+// 각 스레드에 오래된 순 답글 replyPreviewCount개를 붙인다. 삭제된 댓글은 살아 있는 답글이
+// 있을 때만 자리 표시로 남는다. id는 단조 증가라 id 순서가 작성 순서다.
 func (s *server) listComments(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.db.Query(r.Context(), `
-		SELECT c.id, c.parent_id, COALESCE(c.user_id, '') AS user_id, COALESCE(u.nickname, '') AS nickname,
-		       (SELECT `+avatarURLExpr+` FROM users au WHERE au.id = c.user_id) AS avatar_url,
-		       CASE WHEN c.deleted_at IS NULL THEN c.body ELSE '' END AS body,
-		       to_char(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
-		       (c.deleted_at IS NOT NULL) AS deleted,
-		       (c.edited_at IS NOT NULL) AS edited
+	ctx := r.Context()
+	albumID := r.PathValue("id")
+	limit := commentLimit(r)
+	rows, err := s.db.Query(ctx, `
+		SELECT `+commentCols+`,
+		       (SELECT count(*) FROM comments rp WHERE rp.parent_id = c.id AND rp.deleted_at IS NULL)::int AS reply_count
 		FROM comments c LEFT JOIN users u ON u.id = c.user_id
-		WHERE c.album_id = $1
+		WHERE c.album_id = $1 AND c.parent_id IS NULL
+		  AND ($2::bigint IS NULL OR c.id < $2)
 		  AND (c.deleted_at IS NULL
 		       OR EXISTS (SELECT 1 FROM comments rp WHERE rp.parent_id = c.id AND rp.deleted_at IS NULL))
-		ORDER BY COALESCE(c.parent_id, c.id), c.id`, r.PathValue("id"))
+		ORDER BY c.id DESC
+		LIMIT $3`, albumID, queryInt64Ptr(r, "before"), limit+1)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	comments, err := pgx.CollectRows(rows, pgx.RowToStructByName[Comment])
+	threads, err := pgx.CollectRows(rows, pgx.RowToStructByName[commentThread])
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	if comments == nil {
-		comments = []Comment{}
+	page := commentPage{Threads: []commentThread{}}
+	if len(threads) > limit {
+		threads = threads[:limit]
+		page.NextCursor = &threads[limit-1].ID
 	}
-	writeJSON(w, 200, comments)
+
+	ids := make([]int64, len(threads))
+	byID := make(map[int64]*commentThread, len(threads))
+	for i := range threads {
+		threads[i].Replies = []Comment{}
+		ids[i] = threads[i].ID
+		byID[threads[i].ID] = &threads[i]
+	}
+	if len(ids) > 0 {
+		rows, err = s.db.Query(ctx, `
+			SELECT `+commentCols+`
+			FROM (SELECT *, row_number() OVER (PARTITION BY parent_id ORDER BY id) AS rn
+			      FROM comments WHERE parent_id = ANY($1) AND deleted_at IS NULL) c
+			LEFT JOIN users u ON u.id = c.user_id
+			WHERE c.rn <= $2
+			ORDER BY c.parent_id, c.id`, ids, replyPreviewCount)
+		if err != nil {
+			writeErr(w, 500, err.Error())
+			return
+		}
+		replies, err := pgx.CollectRows(rows, pgx.RowToStructByName[Comment])
+		if err != nil {
+			writeErr(w, 500, err.Error())
+			return
+		}
+		for _, rp := range replies {
+			if t := byID[*rp.ParentID]; t != nil {
+				t.Replies = append(t.Replies, rp)
+			}
+		}
+	}
+	page.Threads = append(page.Threads, threads...)
+
+	if err := s.db.QueryRow(ctx,
+		"SELECT count(*) FROM comments WHERE album_id = $1 AND deleted_at IS NULL", albumID).Scan(&page.Total); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, page)
+}
+
+// listReplies는 공개 API다. 한 스레드의 살아 있는 답글을 오래된 순으로 ?after=<id> 뒤부터 limit개씩 준다.
+// 첫 요청의 after는 listComments가 준 미리보기의 마지막 답글 id다.
+func (s *server) listReplies(w http.ResponseWriter, r *http.Request) {
+	parentID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeErr(w, 400, "invalid comment id")
+		return
+	}
+	limit := commentLimit(r)
+	rows, err := s.db.Query(r.Context(), `
+		SELECT `+commentCols+`
+		FROM comments c LEFT JOIN users u ON u.id = c.user_id
+		WHERE c.parent_id = $1 AND c.deleted_at IS NULL
+		  AND ($2::bigint IS NULL OR c.id > $2)
+		ORDER BY c.id
+		LIMIT $3`, parentID, queryInt64Ptr(r, "after"), limit+1)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	replies, err := pgx.CollectRows(rows, pgx.RowToStructByName[Comment])
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	page := replyPage{Replies: []Comment{}}
+	if len(replies) > limit {
+		replies = replies[:limit]
+		page.NextCursor = &replies[limit-1].ID
+	}
+	page.Replies = append(page.Replies, replies...)
+	writeJSON(w, 200, page)
+}
+
+func queryInt64Ptr(r *http.Request, key string) *int64 {
+	if n, err := strconv.ParseInt(r.URL.Query().Get(key), 10, 64); err == nil {
+		return &n
+	}
+	return nil
 }
 
 func (s *server) addComment(w http.ResponseWriter, r *http.Request) {
