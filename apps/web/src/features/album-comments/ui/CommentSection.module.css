@@ -134,8 +134,14 @@
 }
 
 .body {
+  /* 본문을 닉네임 시작점에 맞춘다. 아바타 24px(AVATAR_SIZE)과 .meta의 gap 8px을 더한 값이다. */
+  --avatar-indent: 32px;
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.content {
+  padding-left: var(--avatar-indent);
 }
 
 /* 닉네임 링크와 같은 곳으로 가는 중복 링크라 탭 순서와 화면 읽기에서는 뺀다(tabIndex, aria-hidden). */
@@ -160,12 +166,30 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   font-size: 0.75rem;
   color: var(--muted);
 }
 
+.meta time,
+.edited {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* 수정·삭제 버튼은 줄 오른쪽 끝에 붙인다. */
+.actions {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
 /* 공개 프로필 링크. 밑줄은 hover에서만 — 댓글 헤더가 링크투성이로 보이면 산만하다. */
 .nickname {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--fg);
@@ -205,7 +229,7 @@
 
 .text,
 .removed {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   font-size: 0.88rem;
   line-height: 1.55;
   white-space: pre-wrap;

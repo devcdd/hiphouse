@@ -16,6 +16,8 @@ import { CommentForm } from './CommentForm'
 import styles from './CommentSection.module.css'
 
 const fmt = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short' })
+// CommentSection.module.css의 --avatar-indent(아바타 + 간격)와 맞춘다.
+const AVATAR_SIZE = 24
 
 export function CommentSection({ albumId }: { albumId: string }) {
   const { user, isAuthed, isAdmin } = useAuth()
@@ -36,70 +38,77 @@ export function CommentSection({ albumId }: { albumId: string }) {
   const row = (c: Comment, isReply: boolean) => (
     <li key={c.id} className={isReply ? styles.reply : styles.comment}>
       {isReply && <CornerDownRight size={14} className={styles.replyIcon} aria-hidden />}
-      {c.deleted ? (
-        <Avatar name="" size={isReply ? 26 : 32} />
-      ) : (
-        <Link to={`/users/${encodeURIComponent(c.user_id)}`} className={styles.avatarLink} tabIndex={-1} aria-hidden>
-          <Avatar src={c.avatar_url ? apiUrl(c.avatar_url) : null} name={c.nickname} size={isReply ? 26 : 32} />
-        </Link>
-      )}
       <div className={styles.body}>
         <div className={styles.meta}>
-          {/* 삭제된 댓글은 작성자를 드러내지 않으므로 링크도 걸지 않는다. */}
+          {/* 삭제된 댓글은 작성자를 드러내지 않으므로 사진과 링크 없이 빈 원만 둔다. */}
           {c.deleted ? (
-            <span className={styles.nickname} />
+            <Avatar name="" size={AVATAR_SIZE} />
           ) : (
-            <Link to={`/users/${encodeURIComponent(c.user_id)}`} className={styles.nickname}>
-              {c.nickname}
-            </Link>
+            <>
+              <Link
+                to={`/users/${encodeURIComponent(c.user_id)}`}
+                className={styles.avatarLink}
+                tabIndex={-1}
+                aria-hidden
+              >
+                <Avatar src={c.avatar_url ? apiUrl(c.avatar_url) : null} name={c.nickname} size={AVATAR_SIZE} />
+              </Link>
+              <Link to={`/users/${encodeURIComponent(c.user_id)}`} className={styles.nickname}>
+                {c.nickname}
+              </Link>
+              <time dateTime={c.created_at}>{fmt.format(new Date(c.created_at))}</time>
+            </>
           )}
-          {!c.deleted && <time dateTime={c.created_at}>{fmt.format(new Date(c.created_at))}</time>}
           {c.edited && <span className={styles.edited}>수정됨</span>}
-          {isMine(c) && (
-            <button
-              type="button"
-              className={styles.iconBtn}
-              disabled={edit.isPending}
-              aria-label="댓글 수정"
-              onClick={() => setEditingId(editingId === c.id ? null : c.id)}
-            >
-              <Pencil size={13} strokeWidth={2.2} />
-            </button>
+          <span className={styles.actions}>
+            {isMine(c) && (
+              <button
+                type="button"
+                className={styles.iconBtn}
+                disabled={edit.isPending}
+                aria-label="댓글 수정"
+                onClick={() => setEditingId(editingId === c.id ? null : c.id)}
+              >
+                <Pencil size={13} strokeWidth={2.2} />
+              </button>
+            )}
+            {canDelete(c) && (
+              <button
+                type="button"
+                className={styles.iconBtn}
+                disabled={remove.isPending}
+                aria-label="댓글 삭제"
+                onClick={() => remove.mutate(c.id)}
+              >
+                <Trash2 size={13} strokeWidth={2.2} />
+              </button>
+            )}
+          </span>
+        </div>
+        <div className={styles.content}>
+          {editingId === c.id ? (
+            <div className={styles.editForm}>
+              <CommentForm
+                autoFocus
+                initialBody={c.body}
+                submitLabel="수정"
+                pending={edit.isPending}
+                onCancel={() => setEditingId(null)}
+                onSubmit={(body) => {
+                  edit.mutate({ id: c.id, body })
+                  setEditingId(null)
+                }}
+              />
+            </div>
+          ) : (
+            <p className={c.deleted ? styles.removed : styles.text}>{c.deleted ? '삭제된 댓글입니다' : c.body}</p>
           )}
-          {canDelete(c) && (
-            <button
-              type="button"
-              className={styles.iconBtn}
-              disabled={remove.isPending}
-              aria-label="댓글 삭제"
-              onClick={() => remove.mutate(c.id)}
-            >
-              <Trash2 size={13} strokeWidth={2.2} />
+          {!isReply && isAuthed && !c.deleted && replyTo !== c.id && editingId !== c.id && (
+            <button type="button" className={styles.replyBtn} onClick={() => setReplyTo(c.id)}>
+              답글
             </button>
           )}
         </div>
-        {editingId === c.id ? (
-          <div className={styles.editForm}>
-            <CommentForm
-              autoFocus
-              initialBody={c.body}
-              submitLabel="수정"
-              pending={edit.isPending}
-              onCancel={() => setEditingId(null)}
-              onSubmit={(body) => {
-                edit.mutate({ id: c.id, body })
-                setEditingId(null)
-              }}
-            />
-          </div>
-        ) : (
-          <p className={c.deleted ? styles.removed : styles.text}>{c.deleted ? '삭제된 댓글입니다' : c.body}</p>
-        )}
-        {!isReply && isAuthed && !c.deleted && replyTo !== c.id && editingId !== c.id && (
-          <button type="button" className={styles.replyBtn} onClick={() => setReplyTo(c.id)}>
-            답글
-          </button>
-        )}
       </div>
     </li>
   )
@@ -113,11 +122,7 @@ export function CommentSection({ albumId }: { albumId: string }) {
 
       {isAuthed ? (
         <div className={styles.composer}>
-          <Avatar
-            src={user?.avatar_url ? apiUrl(user.avatar_url) : null}
-            name={user?.nickname || '나'}
-            size={32}
-          />
+          <Avatar src={user?.avatar_url ? apiUrl(user.avatar_url) : null} name={user?.nickname || '나'} size={32} />
           <div className={styles.composerForm}>
             <CommentForm onSubmit={(body) => add.mutate({ body })} pending={add.isPending} />
           </div>
