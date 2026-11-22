@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<!-- 앨범 홍보 포스터(apps/web/.../renderPromoImage.ts)와 같은 판형·서체·색을 쓴다. 숫자는 그쪽 상수와 맞춘다. -->
+<style>
+  @font-face { font-family: Pretendard; font-weight: 500; src: url(https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/woff2/Pretendard-Medium.woff2); }
+  @font-face { font-family: Pretendard; font-weight: 700; src: url(https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/woff2/Pretendard-Bold.woff2); }
+  @font-face { font-family: Anton; src: url(https://cdn.jsdelivr.net/npm/@fontsource/anton@5.2.5/files/anton-latin-400-normal.woff2); }
+  @font-face { font-family: "Black Han Sans"; unicode-range: U+1100-11FF, U+3130-318F, U+AC00-D7AF;
+    src: url(https://cdn.jsdelivr.net/npm/@fontsource/black-han-sans@5.2.5/files/black-han-sans-korean-400-normal.woff2); }
+  @font-face { font-family: "JetBrains Mono"; font-weight: 500; src: url(https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.2.5/files/jetbrains-mono-latin-500-normal.woff2); }
+
+  :root {
+    --pad: 86px; --top: 118px; --cover: 908px;
+    --ui: Pretendard, -apple-system, "Apple SD Gothic Neo", sans-serif;
+    --display: Anton, "Black Han Sans", var(--ui);
+    --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+    --foil: linear-gradient(115deg, #dcc289 0%, #b9945b 24%, #f7ecce 46%, #e2ca95 56%, #b18b52 80%, #dfc790 100%);
+  }
+  /* 배경색은 홍보 포스터의 PROMO_BACKGROUNDS에서 고른다. 어두운 배경이면 종이색 글자, 밝으면 먹색 글자. */
+  .ink      { --bg: rgb(20,20,20);    --fg: rgb(244,241,234); --sub: rgba(244,241,234,.64); }
+  .paper    { --bg: rgb(236,232,223); --fg: rgb(17,17,17);    --sub: rgba(17,17,17,.64); }
+  .burgundy { --bg: rgb(94,22,34);    --fg: rgb(244,241,234); --sub: rgba(244,241,234,.64); }
+  .forest   { --bg: rgb(24,64,48);    --fg: rgb(244,241,234); --sub: rgba(244,241,234,.64); }
+  .navy     { --bg: rgb(22,34,72);    --fg: rgb(244,241,234); --sub: rgba(244,241,234,.64); }
+  .mustard  { --bg: rgb(214,170,52);  --fg: rgb(17,17,17);    --sub: rgba(17,17,17,.64); }
+
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1080px; height: 1350px; overflow: hidden; }
+  .poster { position: relative; width: 1080px; height: 1350px; background: var(--bg); color: var(--fg); font-family: var(--ui); }
+
+  .wordmark { position: absolute; top: 0; left: 0; right: 0; height: var(--top); display: grid; place-items: center;
+    font: 400 32px var(--display); letter-spacing: .12em; text-indent: .12em; padding-top: 4px; }
+
+  /* 바닥에 놓인 재킷처럼 넓고 옅은 그림자 + 닿는 면의 짧고 짙은 그림자. */
+  .jacket { position: absolute; left: var(--pad); top: var(--top); width: var(--cover); height: var(--cover);
+    border-radius: 3px; overflow: hidden; background: #0d0d0d;
+    box-shadow: 0 22px 44px rgba(0,0,0,.3), 0 3px 9px rgba(0,0,0,.32); }
+  .jacket img { position: absolute; display: block; }
+  /* 수축 필름에 비친 빛. 스티커와 같은 방향으로 기울인다. */
+  .jacket::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(115deg, rgba(255,255,255,0) 18%, rgba(255,255,255,.07) 30%, rgba(255,255,255,.02) 38%, rgba(255,255,255,0) 46%),
+                linear-gradient(to bottom, rgba(255,255,255,.04), rgba(255,255,255,0) 30%); }
+
+  /* 앨범 재킷 여러 장을 바닥에 흩어 놓은 장면(썸네일). */
+  .floor { position: absolute; left: var(--pad); top: var(--top); width: var(--cover); height: var(--cover); }
+  .floor .lp { position: absolute; width: 470px; height: 470px; border-radius: 3px; overflow: hidden;
+    box-shadow: 0 22px 44px rgba(0,0,0,.3), 0 3px 9px rgba(0,0,0,.32); }
+  .floor .lp img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .floor .lp::after { content: ""; position: absolute; inset: 0;
+    background: linear-gradient(115deg, rgba(255,255,255,0) 20%, rgba(255,255,255,.09) 32%, rgba(255,255,255,0) 44%); }
+
+  /* 검정 스티커에 샴페인 골드 박. 홍보 포스터 drawSticker와 같은 크기·기울기. */
+  .sticker { position: absolute; right: calc(1080px - var(--pad) - var(--cover) + 24px); top: calc(var(--top) + var(--cover) - 24px - 138px);
+    height: 138px; padding: 0 38px; border-radius: 12px; transform: rotate(-4deg); transform-origin: 100% 100%;
+    background: linear-gradient(#1d1d1e, #0a0a0b);
+    box-shadow: 0 7px 18px rgba(0,0,0,.3), 0 1.5px 4px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.3);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+  /* 기능 소개 장은 아래쪽에 화면 내용이 몰려 있어 스티커를 오른쪽 위로 옮긴다. */
+  .sticker.top { top: calc(var(--top) + 24px); transform-origin: 100% 0; }
+  .sticker::before { content: ""; position: absolute; inset: 8px; border-radius: 7px; padding: 1.5px; background: var(--foil);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+  .sticker b, .sticker small { background: var(--foil); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .sticker b { font: 400 58px/1 var(--display); letter-spacing: .05em; margin-right: -.05em; }
+  .sticker small { font: 500 15px/1 var(--mono); letter-spacing: .2em; display: flex; align-items: center; gap: 14px; }
+  .sticker small::before, .sticker small::after { content: ""; width: 28px; height: 1px; background: #c9ab72; }
+
+  /* 아래 띠: 메타 줄을 바닥에 두고 제목, 라벨 순으로 위로 쌓는다. */
+  .caption { position: absolute; left: var(--pad); right: var(--pad); bottom: 52px; display: flex; flex-direction: column; }
+  .label { font: 700 30px var(--ui); color: var(--sub); letter-spacing: .02em; margin-bottom: 14px; }
+  h1 { font: 400 var(--title, 92px)/1.04 var(--display); letter-spacing: -0.005em; word-break: keep-all; }
+  .meta { margin-top: 30px; font: 500 18px var(--mono); letter-spacing: .12em; color: var(--sub); white-space: pre; }
+</style>
+</head>
+<body>
+<div class="poster {{cls}}" style="{{style}}">
+  <div class="wordmark">HIPHOUSE</div>
+  {{body}}
+</div>
+</body>
+</html>
