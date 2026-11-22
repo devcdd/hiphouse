@@ -11,5 +11,6 @@ export {
   updateNickname,
   updateProfilePublic,
   uploadAvatar,
+  withdraw,
 } from './api/authApi'
 export { useAdminMode, setAdminMode } from './model/adminMode'

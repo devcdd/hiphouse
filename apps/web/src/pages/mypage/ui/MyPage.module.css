@@ -213,6 +213,49 @@ button.menuItem {
   font-size: 0.78rem;
 }
 
+/* --- withdraw (/me/withdraw) --- */
+.withdrawLink {
+  align-self: flex-end;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-decoration: underline;
+}
+
+.withdrawLink:hover {
+  color: var(--fg);
+}
+
+.notice {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.noticeList {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.danger {
+  flex: 0 0 auto;
+  padding: 9px 18px;
+  border: none;
+  border-radius: 8px;
+  background: #d93636;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.danger:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 /* --- album grid (/me/rated) --- */
 .grid {
   display: grid;

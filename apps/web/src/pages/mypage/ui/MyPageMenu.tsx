@@ -41,6 +41,9 @@ function Menu() {
         ))}
         {isAdminUser && <AdminModeToggle />}
       </nav>
+      <Link to="/me/withdraw" className={styles.withdrawLink}>
+        회원 탈퇴
+      </Link>
     </div>
   )
 }

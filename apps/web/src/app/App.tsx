@@ -6,7 +6,14 @@ import { ArtistDetailPage } from '@/pages/artist-detail'
 import { SearchPage } from '@/pages/search'
 import { AuthCallbackPage } from '@/pages/auth-callback'
 import { FavoritesPage } from '@/pages/favorites'
-import { FollowedArtistsPage, MyWallPostsPage, MyPageMenu, NicknamePage, RatedAlbumsPage } from '@/pages/mypage'
+import {
+  FollowedArtistsPage,
+  MyWallPostsPage,
+  MyPageMenu,
+  NicknamePage,
+  RatedAlbumsPage,
+  WithdrawPage,
+} from '@/pages/mypage'
 import { UserProfilePage } from '@/pages/user-profile'
 import { AdminPage } from '@/pages/admin'
 import { WelcomePage } from '@/pages/welcome'
@@ -33,6 +40,7 @@ export function App() {
         <Route path="/me/rated" element={<RatedAlbumsPage />} />
         <Route path="/me/following" element={<FollowedArtistsPage />} />
         <Route path="/me/wall" element={<MyWallPostsPage />} />
+        <Route path="/me/withdraw" element={<WithdrawPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/auth/kakao/callback" element={<AuthCallbackPage />} />
       </Route>

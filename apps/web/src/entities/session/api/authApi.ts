@@ -24,6 +24,11 @@ export function deleteAvatar(): Promise<User> {
   return apiDelete<User>('/me/avatar')
 }
 
+// 되돌릴 수 없다. 성공하면 서버의 세션도 모두 사라지므로 호출한 쪽에서 로컬 토큰을 지운다.
+export function withdraw(): Promise<void> {
+  return apiDelete<void>('/me')
+}
+
 export interface Session {
   token: string
   refresh_token: string
