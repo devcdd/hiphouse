@@ -12,6 +12,8 @@
   text-transform: uppercase;
   container-type: inline-size;
   line-height: 1;
+  /* 흰 배경 사진이나 밝은 커버도 윤곽이 보이도록 연한 테두리를 두른다. 바깥 그림자라 크기와 overflow 클립에 영향이 없다. */
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--fg) 12%, transparent);
 }
 
 /* cqw는 조상 컨테이너 기준이라 자식에 걸어야 아바타 크기를 따라간다. 아바타 자체에 걸면

@@ -138,6 +138,24 @@
   min-width: 0;
 }
 
+/* 닉네임 링크와 같은 곳으로 가는 중복 링크라 탭 순서와 화면 읽기에서는 뺀다(tabIndex, aria-hidden). */
+.avatarLink {
+  flex: 0 0 auto;
+  display: block;
+  border-radius: 50%;
+}
+
+.composer {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.composerForm {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .meta {
   display: flex;
   align-items: center;

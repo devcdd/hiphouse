@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { CornerDownRight, MessageSquare, Pencil, Trash2 } from 'lucide-react'
 import { useAuth } from '@/entities/session'
 import { useStartSignIn } from '@/features/auth'
+import { apiUrl } from '@/shared/config'
+import { Avatar } from '@/shared/ui/Avatar'
 import type { Comment } from '@/features/album-comments/api/commentApi'
 import {
   useAddComment,
@@ -34,6 +36,13 @@ export function CommentSection({ albumId }: { albumId: string }) {
   const row = (c: Comment, isReply: boolean) => (
     <li key={c.id} className={isReply ? styles.reply : styles.comment}>
       {isReply && <CornerDownRight size={14} className={styles.replyIcon} aria-hidden />}
+      {c.deleted ? (
+        <Avatar name="" size={isReply ? 26 : 32} />
+      ) : (
+        <Link to={`/users/${encodeURIComponent(c.user_id)}`} className={styles.avatarLink} tabIndex={-1} aria-hidden>
+          <Avatar src={c.avatar_url ? apiUrl(c.avatar_url) : null} name={c.nickname} size={isReply ? 26 : 32} />
+        </Link>
+      )}
       <div className={styles.body}>
         <div className={styles.meta}>
           {/* 삭제된 댓글은 작성자를 드러내지 않으므로 링크도 걸지 않는다. */}
@@ -103,7 +112,16 @@ export function CommentSection({ albumId }: { albumId: string }) {
       </h2>
 
       {isAuthed ? (
-        <CommentForm onSubmit={(body) => add.mutate({ body })} pending={add.isPending} />
+        <div className={styles.composer}>
+          <Avatar
+            src={user?.avatar_url ? apiUrl(user.avatar_url) : null}
+            name={user?.nickname || '나'}
+            size={32}
+          />
+          <div className={styles.composerForm}>
+            <CommentForm onSubmit={(body) => add.mutate({ body })} pending={add.isPending} />
+          </div>
+        </div>
       ) : (
         <button type="button" className={styles.login} onClick={startSignIn}>
           로그인하고 댓글 남기기
