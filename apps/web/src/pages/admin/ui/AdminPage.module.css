@@ -70,25 +70,62 @@
   opacity: 0.75;
 }
 
-.restore {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 1;
+.tombHint {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.tombList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tombRow {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--surface);
+}
+
+.tombText {
+  flex: 1;
+  min-width: 0;
+}
+
+.tombName {
+  overflow: hidden;
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tombMeta {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.unblock {
+  flex-shrink: 0;
   padding: 5px 12px;
   border: none;
   border-radius: 999px;
-  background: var(--fg);
-  color: var(--bg);
+  background: var(--surface);
+  color: var(--fg);
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
 }
 
-.restore:disabled {
+.unblock:disabled {
   opacity: 0.6;
   cursor: default;
 }

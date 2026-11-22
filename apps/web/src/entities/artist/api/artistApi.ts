@@ -28,8 +28,8 @@ export function updateArtistReleasesWatch(id: string, watch: boolean): Promise<v
 
 export type DeleteMode = 'soft' | 'hard'
 
-// Admin: 'soft' keeps the artist and only soft-deletes the albums they are the
-// sole credit on; 'hard' removes the artist and every album they appear on.
+// Admin: 'soft' keeps the artist and deletes only the albums they are the sole
+// credit on; 'hard' removes the artist and every album they appear on. 둘 다 앨범은 완전 삭제다.
 // Returns how many albums were affected.
 export function deleteArtist(id: string, mode: DeleteMode): Promise<{ mode: DeleteMode; albums: number }> {
   return apiDelete<{ mode: DeleteMode; albums: number }>(`/artists/${encodeURIComponent(id)}?mode=${mode}`)

@@ -186,8 +186,7 @@
 }
 
 /* 파괴적 액션은 편집 도구와 떨어뜨려 우측 끝에 */
-.delete,
-.restore {
+.delete {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -210,13 +209,7 @@
   color: #fff;
 }
 
-.restore {
-  background: var(--surface);
-  color: var(--fg);
-}
-
-.delete:disabled,
-.restore:disabled {
+.delete:disabled {
   opacity: 0.5;
   cursor: default;
 }

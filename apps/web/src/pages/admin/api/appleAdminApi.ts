@@ -22,7 +22,7 @@ export interface AppleAlbumHit {
   total_tracks: number
   artists: string
   in_db: boolean
-  deleted: boolean // DB에 있지만 소프트 삭제된 상태
+  deleted: boolean // 관리자가 지운 앨범이라 크롤해도 다시 들어오지 않음
 }
 
 export function searchAppleAlbums(q: string): Promise<AppleAlbumHit[]> {

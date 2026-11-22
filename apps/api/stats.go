@@ -21,7 +21,7 @@ func (s *server) adminStats(w http.ResponseWriter, r *http.Request) {
 	var st AdminStats
 	err := s.db.QueryRow(r.Context(), `
 		SELECT (SELECT count(*) FROM albums WHERE deleted_at IS NULL),
-		       (SELECT count(*) FROM albums WHERE deleted_at IS NOT NULL),
+		       (SELECT count(*) FROM album_tombstones),
 		       (SELECT count(*) FROM tracks),
 		       (SELECT count(*) FROM artists),
 		       (SELECT count(*) FROM users),

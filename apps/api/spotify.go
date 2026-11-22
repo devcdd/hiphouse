@@ -359,7 +359,11 @@ func upsertAlbums(ctx context.Context, tx pgx.Tx, albums []spAlbum) (map[string]
 			return nil, err
 		}
 		var artistsEdited bool
-		if err := tx.QueryRow(ctx, "SELECT artists_edited_at IS NOT NULL FROM albums WHERE id=$1", al.ID).Scan(&artistsEdited); err != nil {
+		err := tx.QueryRow(ctx, "SELECT artists_edited_at IS NOT NULL FROM albums WHERE id=$1", al.ID).Scan(&artistsEdited)
+		if errors.Is(err, pgx.ErrNoRows) { // albums_insert_guard 트리거가 걸렀다
+			continue
+		}
+		if err != nil {
 			return nil, err
 		}
 		if artistsEdited {
@@ -565,12 +569,12 @@ func (s *server) adminSpotifyAlbumSearch(w http.ResponseWriter, r *http.Request)
 	for _, al := range res.Albums.Items {
 		ids = append(ids, al.ID)
 	}
-	// deleted albums are still rows — say so, otherwise adding one looks like a
-	// no-op in the feed (the add path deliberately never clears deleted_at).
+	// 관리자가 지운 앨범은 album_tombstones에만 남아 있어서 "삭제됨"으로 따로 알려준다.
 	deleted := map[string]bool{}
 	if len(ids) > 0 {
 		rows, err := s.db.Query(r.Context(),
-			"SELECT id, deleted_at IS NOT NULL FROM albums WHERE id = ANY($1)", ids)
+			`SELECT id, false FROM albums WHERE id = ANY($1)
+			 UNION ALL SELECT id, true FROM album_tombstones WHERE id = ANY($1)`, ids)
 		if err != nil {
 			writeErr(w, 500, err.Error())
 			return
@@ -645,6 +649,11 @@ func (s *server) adminSpotifyCrawlAlbum(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// 관리자가 직접 고른 앨범이라, 예전에 지웠더라도 차단을 풀고 다시 받는다.
+	if err := s.clearTombstone(r.Context(), al.ID, ""); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
 	tx, err := s.db.Begin(r.Context())
 	if err != nil {
 		writeErr(w, 500, err.Error())
@@ -666,16 +675,15 @@ func (s *server) adminSpotifyCrawlAlbum(w http.ResponseWriter, r *http.Request) 
 	tracksSynced := s.syncNewAlbumTracks(r.Context(), body.Key, market, []string{al.ID})
 	s.linkNewAlbums(r.Context(), []string{al.ID})
 
-	var deleted bool
-	_ = s.db.QueryRow(r.Context(), "SELECT deleted_at IS NOT NULL FROM albums WHERE id=$1", al.ID).Scan(&deleted)
+	var stored bool
+	_ = s.db.QueryRow(r.Context(), "SELECT EXISTS (SELECT 1 FROM albums WHERE id=$1)", al.ID).Scan(&stored)
 	writeJSON(w, 200, map[string]any{
 		"album_id":      al.ID,
 		"album_name":    al.Name,
-		"saved":         true,
+		"saved":         stored, // false면 Instrumental 앨범이라 albums_insert_guard가 걸렀다
 		"artists":       len(credited),
 		"enriched":      enriched,
 		"tracks_synced": tracksSynced,
-		"deleted":       deleted, // true = row exists but is soft-deleted; restore it in 삭제된 앨범 탭
 	})
 }
 

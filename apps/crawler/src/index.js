@@ -197,12 +197,10 @@ const upsertAlbumRow = (db, r) =>
 export async function upsertAlbum(db, album) {
   const row = toAlbumRow(album);
   await upsertAlbumRow(db, row);
+  // 행이 없으면 API의 albums_insert_guard 트리거가 걸렀다 (관리자가 지운 앨범, Instrumental).
   // 관리자가 크레딧을 고친 앨범은 album_artists를 다시 쓰지 않는다 (API updateAlbumArtists).
-  const { rows: locked } = await db.query(
-    "SELECT 1 FROM albums WHERE id=$1 AND artists_edited_at IS NOT NULL",
-    [row.id]
-  );
-  if (locked.length > 0) return;
+  const { rows } = await db.query("SELECT artists_edited_at IS NOT NULL AS locked FROM albums WHERE id=$1", [row.id]);
+  if (rows.length === 0 || rows[0].locked) return;
   const artists = albumArtists(album);
   await db.query("DELETE FROM album_artists WHERE album_id=$1", [row.id]);
   for (const a of artists) {

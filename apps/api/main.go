@@ -148,7 +148,8 @@ func main() {
 	mux.HandleFunc("GET /albums/{id}/awards", s.listAwards("album_id"))
 	mux.HandleFunc("POST /albums/{id}/awards", s.requireAdmin(s.addAward("album_id")))
 	mux.HandleFunc("DELETE /albums/{id}", s.requireAdmin(s.deleteAlbum))
-	mux.HandleFunc("POST /albums/{id}/restore", s.requireAdmin(s.restoreAlbum))
+	mux.HandleFunc("GET /admin/album-tombstones", s.requireAdmin(s.listAlbumTombstones))
+	mux.HandleFunc("DELETE /admin/album-tombstones/{id}", s.requireAdmin(s.deleteAlbumTombstone))
 
 	// Artists — reads public, writes admin-only
 	mux.HandleFunc("GET /artists", s.listArtists)
@@ -534,23 +535,53 @@ func (s *server) ensureAuthSchema(ctx context.Context) error {
 			AFTER INSERT OR UPDATE OF deleted_at OR DELETE ON comments
 			FOR EACH ROW EXECUTE FUNCTION albums_comment_counters();
 
-		-- Instrumental 앨범은 소프트 삭제 상태로만 들어오게 한다. 앨범을 넣는 경로가 Spotify 크롤,
-		-- Apple 크롤, 관리자 수동 추가, Node 크롤러로 넷이라 한 곳에서 막는다. 행은 남겨서
-		-- 다음 크롤에서 같은 앨범을 다시 새 앨범으로 받지 않는다. "3Songs & Instrumentals"처럼
-		-- 보컬곡과 묶인 앨범은 남긴다. BEFORE INSERT라 ON CONFLICT DO UPDATE로 기존 행을 고칠 때는
-		-- deleted_at이 SET에 없어서 관리자가 복구한 앨범은 다시 지워지지 않는다.
-		CREATE OR REPLACE FUNCTION albums_hide_instrumental() RETURNS trigger AS $fn$
+		-- 관리자가 지운 앨범은 행을 지우고 id만 여기 남긴다. 크롤러는 DB에 없는 앨범을 새 앨범으로
+		-- 받기 때문에, 이 기록이 없으면 다음 신보 체크에서 같은 앨범이 다시 들어온다.
+		CREATE TABLE IF NOT EXISTS album_tombstones (
+			id TEXT PRIMARY KEY,
+			apple_id TEXT,
+			name TEXT NOT NULL DEFAULT '',
+			artists TEXT NOT NULL DEFAULT '',
+			deleted_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		);
+		CREATE INDEX IF NOT EXISTS idx_album_tombstones_apple ON album_tombstones(apple_id) WHERE apple_id IS NOT NULL;
+
+		-- 앨범을 넣는 경로가 Spotify 크롤, Apple 크롤, 관리자 수동 추가, Node 크롤러로 넷이라
+		-- 삭제 기록과 Instrumental 앨범은 DB에서 한 번에 거른다. "3Songs & Instrumentals"처럼
+		-- 보컬곡과 묶인 앨범은 받는다.
+		DROP TRIGGER IF EXISTS trg_albums_hide_instrumental ON albums;
+		DROP FUNCTION IF EXISTS albums_hide_instrumental();
+		CREATE OR REPLACE FUNCTION albums_insert_guard() RETURNS trigger AS $fn$
 		BEGIN
+			IF EXISTS (SELECT 1 FROM album_tombstones t
+			           WHERE t.id = NEW.id OR (NEW.apple_id IS NOT NULL AND t.apple_id = NEW.apple_id)) THEN
+				RETURN NULL;
+			END IF;
 			IF NEW.name ~* 'instrumental'
 			   AND NEW.name !~* '(&|\+| and )\s*instrumental|instrumentals?\s*(&|\+| and)' THEN
-				NEW.deleted_at := COALESCE(NEW.deleted_at, now());
+				RETURN NULL;
 			END IF;
 			RETURN NEW;
 		END $fn$ LANGUAGE plpgsql;
-
-		CREATE OR REPLACE TRIGGER trg_albums_hide_instrumental
+		CREATE OR REPLACE TRIGGER trg_albums_insert_guard
 			BEFORE INSERT ON albums
-			FOR EACH ROW EXECUTE FUNCTION albums_hide_instrumental();
+			FOR EACH ROW EXECUTE FUNCTION albums_insert_guard();
+
+		-- 위에서 앨범 행이 걸러져도 크롤 코드는 이어서 크레딧과 트랙을 넣는다. 두 테이블에 albums FK가
+		-- 없어서 그대로 두면 고아 행이 남으니, 앨범이 없으면 조용히 버린다.
+		CREATE OR REPLACE FUNCTION skip_without_album() RETURNS trigger AS $fn$
+		BEGIN
+			IF NOT EXISTS (SELECT 1 FROM albums WHERE id = NEW.album_id) THEN
+				RETURN NULL;
+			END IF;
+			RETURN NEW;
+		END $fn$ LANGUAGE plpgsql;
+		CREATE OR REPLACE TRIGGER trg_album_artists_need_album
+			BEFORE INSERT ON album_artists
+			FOR EACH ROW EXECUTE FUNCTION skip_without_album();
+		CREATE OR REPLACE TRIGGER trg_tracks_need_album
+			BEFORE INSERT ON tracks
+			FOR EACH ROW EXECUTE FUNCTION skip_without_album();
 
 		-- Reconcile on boot: backfills the columns the first time and self-heals any
 		-- drift afterwards (a trigger added mid-flight, a manual SQL fix). Touches

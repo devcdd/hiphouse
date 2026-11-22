@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Flag, RotateCcw, Trash2 } from 'lucide-react'
+import { Check, Flag, Trash2 } from 'lucide-react'
 import { AlbumCard } from '@/entities/album'
 import { clearFlags, fetchFlaggedAlbums } from '@/features/report-album'
-import { apiDelete, apiPost } from '@/shared/api/client'
+import { apiDelete } from '@/shared/api/client'
+import { displayName } from '@/shared/lib/displayName'
 import { useToast } from '@/shared/ui/toast'
 import styles from './AdminPage.module.css'
 
 // 사용자가 "힙합이 아니에요"로 신고한 앨범 — 신고 많은 순. 여기서 바로
-// 삭제(소프트)하거나, 확인 결과 문제없으면 신고를 지운다.
+// 완전 삭제하거나, 확인 결과 문제없으면 신고를 지운다.
 export function ReportsTab() {
   const qc = useQueryClient()
   const toast = useToast()
@@ -22,15 +23,18 @@ export function ReportsTab() {
     qc.invalidateQueries({ queryKey: ['albums'] })
   }
 
-  const toggleDelete = useMutation({
-    mutationFn: ({ id, deleted }: { id: string; deleted: boolean }) =>
-      deleted ? apiPost(`/albums/${encodeURIComponent(id)}/restore`) : apiDelete(`/albums/${encodeURIComponent(id)}`),
-    onSuccess: (_data, { deleted }) => {
+  const remove = useMutation({
+    mutationFn: (id: string) => apiDelete(`/albums/${encodeURIComponent(id)}`),
+    onSuccess: () => {
       refresh()
-      toast(deleted ? '앨범을 복구했습니다' : '앨범을 삭제했습니다')
+      toast('앨범을 삭제했습니다')
     },
     onError: () => toast('처리에 실패했습니다', 'error'),
   })
+  const confirmRemove = (id: string, name: string) => {
+    const msg = `“${name}”을(를) 완전히 삭제할까요?\n별점, 댓글, 즐겨찾기도 함께 지워지고 되돌릴 수 없습니다.`
+    if (window.confirm(msg)) remove.mutate(id)
+  }
 
   const dismiss = useMutation({
     mutationFn: (id: string) => clearFlags('not-hiphop', id),
@@ -58,11 +62,11 @@ export function ReportsTab() {
             <button
               type="button"
               className={styles.reportDelete}
-              disabled={toggleDelete.isPending}
-              onClick={() => toggleDelete.mutate({ id: a.id, deleted: !!a.deleted_at })}
+              disabled={remove.isPending}
+              onClick={() => confirmRemove(a.id, displayName(a))}
             >
-              {a.deleted_at ? <RotateCcw size={13} strokeWidth={2.4} /> : <Trash2 size={13} strokeWidth={2.4} />}
-              {a.deleted_at ? '복구' : '삭제'}
+              <Trash2 size={13} strokeWidth={2.4} />
+              삭제
             </button>
             <button
               type="button"

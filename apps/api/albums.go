@@ -569,29 +569,25 @@ func (s *server) updateAlbumDisplayName(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(204)
 }
 
-// deleteAlbum soft-deletes: sets deleted_at instead of removing the row.
+// deleteAlbum은 앨범과 거기 달린 평가, 댓글, 즐겨찾기를 지운다. 되돌릴 수 없다.
 func (s *server) deleteAlbum(w http.ResponseWriter, r *http.Request) {
-	tag, err := s.db.Exec(r.Context(), "UPDATE albums SET deleted_at=now() WHERE id=$1 AND deleted_at IS NULL", r.PathValue("id"))
+	tx, err := s.db.Begin(r.Context())
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	if tag.RowsAffected() == 0 {
-		writeErr(w, 404, "album not found or already deleted")
-		return
-	}
-	w.WriteHeader(204)
-}
-
-// restoreAlbum clears deleted_at (admin undo).
-func (s *server) restoreAlbum(w http.ResponseWriter, r *http.Request) {
-	tag, err := s.db.Exec(r.Context(), "UPDATE albums SET deleted_at=NULL WHERE id=$1 AND deleted_at IS NOT NULL", r.PathValue("id"))
+	defer tx.Rollback(r.Context())
+	n, err := hardDeleteAlbums(r.Context(), tx, []string{r.PathValue("id")})
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	if tag.RowsAffected() == 0 {
-		writeErr(w, 404, "album not found or not deleted")
+	if n == 0 {
+		writeErr(w, 404, "album not found")
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		writeErr(w, 500, err.Error())
 		return
 	}
 	w.WriteHeader(204)

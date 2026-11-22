@@ -102,6 +102,9 @@ func (s *server) amArtistAlbums(ctx context.Context, artistID, view string, max 
 	return out, nil
 }
 
+// errAlbumSkipped: albums_insert_guard 트리거가 앨범 행을 거른 경우. 크롤 실패가 아니다.
+var errAlbumSkipped = errors.New("album skipped by insert guard")
+
 type knownAlbum struct {
 	ID      string
 	Deleted bool
@@ -114,8 +117,8 @@ const normTitleSQL = `regexp_replace(regexp_replace(lower(%s), '\s*[(\[](feat|wi
 // dayDiffSQL — 두 'YYYY-MM-DD' 문자열의 일수 차. 연·월 정밀도 날짜면 NULL (비교 불가).
 const dayDiffSQL = `CASE WHEN length(%[1]s) = 10 AND length(%[2]s) = 10 THEN abs(%[1]s::date - %[2]s::date) END`
 
-// knownAppleAlbums maps each Apple album already in the DB to its row. 소프트 삭제된
-// 행도 매칭해 관리자가 지운 앨범이 되살아나지 않게 한다. apple_id·PK·UPC가 우선이고,
+// knownAppleAlbums maps each Apple album already in the DB to its row. album_tombstones에
+// 남은 앨범도 Deleted로 돌려줘서 관리자가 지운 앨범이 되살아나지 않게 한다. apple_id·PK·UPC가 우선이고,
 // Apple 연결에 실패한 Spotify 행은 퍼지 매칭으로 잡는다 — 양쪽 발매일이 며칠씩 어긋나고
 // 제목이 영문/한글로 갈리는 앨범이 흔해서, 같은 날 같은 제목 키이거나, 같은 아티스트
 // 크레딧에 (같은 트랙 수 ±7일, 3곡 미만은 ±3일) 또는 (같은 제목 키 ±31일)이면 같은 앨범.
@@ -175,7 +178,27 @@ func (s *server) knownAppleAlbums(ctx context.Context, albums []amAlbum, appleAr
 		}
 		out[aid] = k
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	tomb, err := s.db.Query(ctx,
+		`SELECT c.aid, t.id FROM unnest($1::text[]) AS c(aid)
+		 JOIN album_tombstones t ON t.apple_id = c.aid OR t.id = $2 || c.aid`, aids, amIDPrefix)
+	if err != nil {
+		return nil, err
+	}
+	defer tomb.Close()
+	for tomb.Next() {
+		var aid, id string
+		if err := tomb.Scan(&aid, &id); err != nil {
+			return nil, err
+		}
+		if _, ok := out[aid]; !ok {
+			out[aid] = knownAlbum{ID: id, Deleted: true}
+		}
+	}
+	return out, tomb.Err()
 }
 
 // linkArtistByDiscography — 한/영 표기 차이로 이름 매칭이 안 되는 아티스트를, Apple
@@ -294,6 +317,14 @@ func (s *server) storeAppleAlbum(ctx context.Context, al amAlbum) (amSaved, erro
 		amArtURL(al.Attributes.Artwork), upc, amPrecision(date)); err != nil {
 		return saved, err
 	}
+	// albums_insert_guard 트리거가 Instrumental 앨범이나 삭제 기록에 있는 앨범을 걸렀다.
+	var stored bool
+	if err := tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM albums WHERE id=$1)", id).Scan(&stored); err != nil {
+		return saved, err
+	}
+	if !stored {
+		return saved, errAlbumSkipped
+	}
 	if _, err := tx.Exec(ctx, "DELETE FROM album_artists WHERE album_id=$1", id); err != nil {
 		return saved, err
 	}
@@ -356,6 +387,9 @@ func (s *server) addAppleAlbums(ctx context.Context, appleIDs []string) (saved [
 		}
 		for _, al := range page.Data {
 			sv, err := s.storeAppleAlbum(ctx, al)
+			if errors.Is(err, errAlbumSkipped) {
+				continue
+			}
 			if err != nil {
 				return saved, nil, err
 			}
@@ -647,7 +681,7 @@ func (s *server) adminAppleAlbumSearch(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /admin/apple/crawl-album {album_id} — Apple 앨범 1개 추가. 이미 있는 앨범이면
-// 저장하지 않고 그 행을 알려준다 (existing, 소프트 삭제면 deleted).
+// 저장하지 않고 그 행을 알려준다 (existing). Instrumental 앨범이라 걸렀으면 skipped.
 func (s *server) adminAppleCrawlAlbum(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		AlbumID string `json:"album_id"`
@@ -680,6 +714,11 @@ func (s *server) adminAppleCrawlAlbum(w http.ResponseWriter, r *http.Request) {
 	if as := al.Relationships.Artists.Data; len(as) > 0 {
 		mainArtist = as[0].ID
 	}
+	// 관리자가 직접 고른 앨범이라, 예전에 지웠더라도 차단을 풀고 다시 받는다.
+	if err := s.clearTombstone(ctx, amIDPrefix+al.ID, al.ID); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
 	known, err := s.knownAppleAlbums(ctx, page.Data, mainArtist)
 	if err != nil {
 		writeErr(w, 500, err.Error())
@@ -692,6 +731,10 @@ func (s *server) adminAppleCrawlAlbum(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sv, err := s.storeAppleAlbum(ctx, al)
+	if errors.Is(err, errAlbumSkipped) {
+		writeJSON(w, 200, map[string]any{"album_id": sv.ID, "album_name": sv.Name, "saved": false, "skipped": true})
+		return
+	}
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return

@@ -65,8 +65,11 @@ export function CrawlTab() {
     mutationFn: (appleAlbumId: string) => crawlAppleAlbum(appleAlbumId),
     onSuccess: (res) => {
       setMessage(
-        (res.existing ? `${res.album_name}: 이미 등록된 앨범입니다` : `✅ ${res.album_name}: 저장 (크레딧 아티스트 ${res.artists ?? 0}명)`) +
-          (res.deleted ? ' — 삭제된 앨범이라 목록에 보이지 않습니다. 「삭제된 앨범」 탭에서 복구하세요.' : ''),
+        res.skipped
+          ? `${res.album_name}: Instrumental 앨범이라 저장하지 않았습니다`
+          : res.existing
+            ? `${res.album_name}: 이미 등록된 앨범입니다`
+            : `✅ ${res.album_name}: 저장 (크레딧 아티스트 ${res.artists ?? 0}명)`,
       )
       invalidate()
     },

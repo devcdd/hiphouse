@@ -23,7 +23,7 @@ export interface SpotifyAlbumHit {
   total_tracks: number
   artists: string // 크레딧 아티스트명 쉼표 연결
   in_db: boolean
-  deleted: boolean // DB에 있지만 소프트 삭제된 상태
+  deleted: boolean // 관리자가 지운 앨범이라 크롤해도 다시 들어오지 않음
 }
 
 // 앨범명 검색. Spotify는 앨범 단위 장르가 없어서 결과가 장르 무관 — 관리자가 직접 골라 담는다.

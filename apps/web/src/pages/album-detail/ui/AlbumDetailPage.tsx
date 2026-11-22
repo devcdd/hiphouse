@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, RotateCcw, ShieldCheck, Trash2 } from 'lucide-react'
+import { ArrowLeft, ShieldCheck, Trash2 } from 'lucide-react'
 import { useAlbum, type Album } from '@/entities/album'
 import { useAuth } from '@/entities/session'
 import { FavoriteButton, useFavoriteIds } from '@/features/favorite-album'
@@ -14,7 +14,7 @@ import { EditAlbumArtistsButton } from '@/features/edit-album-artists'
 import { AwardSection } from '@/features/awards'
 import { useResolvedTheme } from '@/features/theme'
 import { useStartSignIn } from '@/features/auth'
-import { apiDelete, apiPost } from '@/shared/api/client'
+import { apiDelete } from '@/shared/api/client'
 import { displayName } from '@/shared/lib/displayName'
 import { AlbumDetailSkeleton } from './AlbumDetailSkeleton'
 import { TrackList } from './TrackList'
@@ -182,20 +182,23 @@ export function AlbumDetailPage() {
 // 앨범과 함께 마운트/언마운트되므로 편집 상태가 다른 앨범으로 새지 않는다.
 function AdminCard({ album }: { album: Album }) {
   const qc = useQueryClient()
+  const navigate = useNavigate()
   // 폼 하나가 열려 있으면 나머지 도구는 숨긴다 — 폼이 한 줄 전체를 쓴다.
   const [editing, setEditing] = useState<'name' | 'info' | 'artists' | null>(null)
   const editingChange = (form: 'name' | 'info' | 'artists') => (open: boolean) => setEditing(open ? form : null)
 
-  const toggleDelete = useMutation({
-    mutationFn: (deleted: boolean) =>
-      deleted
-        ? apiPost(`/albums/${encodeURIComponent(album.id)}/restore`)
-        : apiDelete(`/albums/${encodeURIComponent(album.id)}`),
+  const remove = useMutation({
+    mutationFn: () => apiDelete(`/albums/${encodeURIComponent(album.id)}`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['album', album.id] })
+      qc.removeQueries({ queryKey: ['album', album.id] })
       qc.invalidateQueries({ queryKey: ['albums'] })
+      navigate(-1)
     },
   })
+  const confirmRemove = () => {
+    const msg = `“${displayName(album)}”을(를) 완전히 삭제할까요?\n별점, 댓글, 즐겨찾기도 함께 지워지고 되돌릴 수 없습니다.`
+    if (window.confirm(msg)) remove.mutate()
+  }
 
   return (
     <div className={styles.adminCard}>
@@ -221,14 +224,9 @@ function AdminCard({ album }: { album: Album }) {
           <EditAlbumArtistsButton album={album} onEditingChange={editingChange('artists')} />
         )}
         {!editing && (
-          <button
-            type="button"
-            className={album.deleted_at ? styles.restore : styles.delete}
-            disabled={toggleDelete.isPending}
-            onClick={() => toggleDelete.mutate(!!album.deleted_at)}
-          >
-            {album.deleted_at ? <RotateCcw size={14} strokeWidth={2.4} /> : <Trash2 size={14} strokeWidth={2.4} />}
-            {album.deleted_at ? '복구' : '삭제'}
+          <button type="button" className={styles.delete} disabled={remove.isPending} onClick={confirmRemove}>
+            <Trash2 size={14} strokeWidth={2.4} />
+            삭제
           </button>
         )}
       </div>

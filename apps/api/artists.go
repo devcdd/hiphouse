@@ -234,8 +234,8 @@ func (s *server) updateArtistAliases(w http.ResponseWriter, r *http.Request) {
 // deleteArtist has two modes, picked with ?mode= (no default — the two outcomes
 // are too different to guess at):
 //
-//	soft: keep the artist row, soft-delete only the albums they are the ONLY
-//	      credited artist on. Reversible from 관리자 삭제 목록.
+//	soft: keep the artist row, delete only the albums they are the ONLY
+//	      credited artist on. 앨범은 지우되 album_tombstones에 남아 다시 크롤되지 않는다.
 //	hard: delete the artist and EVERY album they are credited on — including
 //	      albums that are really someone else's and only feature them — plus the
 //	      favorites/ratings/comments hanging off those albums. Irreversible.
@@ -268,18 +268,23 @@ func (s *server) deleteArtist(w http.ResponseWriter, r *http.Request) {
 	if mode == "soft" {
 		// "Solo" = the album has exactly one credit row and it points at this
 		// artist, so nothing else on the album is lost.
-		tag, err := tx.Exec(r.Context(), `
-			UPDATE albums SET deleted_at = now()
-			WHERE deleted_at IS NULL AND id IN (
-				SELECT aa.album_id FROM album_artists aa
-				GROUP BY aa.album_id
-				HAVING count(*) = 1 AND min(aa.artist_id) = $1
-			)`, id)
+		rows, err := tx.Query(r.Context(), `
+			SELECT aa.album_id FROM album_artists aa
+			GROUP BY aa.album_id
+			HAVING count(*) = 1 AND min(aa.artist_id) = $1`, id)
 		if err != nil {
 			writeErr(w, 500, err.Error())
 			return
 		}
-		albums = tag.RowsAffected()
+		ids, err := pgx.CollectRows(rows, pgx.RowTo[string])
+		if err != nil {
+			writeErr(w, 500, err.Error())
+			return
+		}
+		if albums, err = hardDeleteAlbums(r.Context(), tx, ids); err != nil {
+			writeErr(w, 500, err.Error())
+			return
+		}
 	} else {
 		// Collect the album ids up front: deleting from album_artists would
 		// otherwise erase the very rows that define the set.
@@ -293,29 +298,9 @@ func (s *server) deleteArtist(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, 500, err.Error())
 			return
 		}
-		if len(ids) > 0 {
-			// favorites/ratings/comments reference album_id without an FK, and
-			// album_artists still holds the co-credits of the doomed albums —
-			// all of it has to go by hand or it lingers as orphan rows.
-			for _, q := range []string{
-				"DELETE FROM favorites WHERE album_id = ANY($1)",
-				"DELETE FROM ratings WHERE album_id = ANY($1)",
-				"DELETE FROM comments WHERE album_id = ANY($1)",
-				"DELETE FROM not_hiphop_reports WHERE album_id = ANY($1)",
-				"DELETE FROM rename_requests WHERE album_id = ANY($1)",
-				"DELETE FROM album_artists WHERE album_id = ANY($1)",
-			} {
-				if _, err := tx.Exec(r.Context(), q, ids); err != nil {
-					writeErr(w, 500, err.Error())
-					return
-				}
-			}
-			tag, err := tx.Exec(r.Context(), "DELETE FROM albums WHERE id = ANY($1)", ids)
-			if err != nil {
-				writeErr(w, 500, err.Error())
-				return
-			}
-			albums = tag.RowsAffected()
+		if albums, err = hardDeleteAlbums(r.Context(), tx, ids); err != nil {
+			writeErr(w, 500, err.Error())
+			return
 		}
 		// follows has no FK to artists either.
 		if _, err := tx.Exec(r.Context(), "DELETE FROM follows WHERE artist_id=$1", id); err != nil {

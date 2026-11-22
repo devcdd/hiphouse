@@ -33,8 +33,8 @@ export interface CrawlAlbumResult {
   artists?: number
   enriched?: number
   tracks_synced?: number
-  deleted?: boolean // 행은 있으나 소프트 삭제 상태 — 삭제된 앨범 탭에서 복구해야 노출됨
   existing?: boolean // Apple 추가: 이미 DB에 있어 저장하지 않음
+  skipped?: boolean // Instrumental 앨범이라 서버가 저장하지 않음
 }
 
 // Admin: 앨범 검색에서 고른 앨범 1개를 DB에 추가.

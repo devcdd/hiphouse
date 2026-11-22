@@ -311,12 +311,12 @@ function DeleteArtistDialog({
 
         <button type="button" className={styles.confirmSoft} disabled={pending} onClick={() => onPick('soft')}>
           단독 앨범만 삭제
-          <span>아티스트는 남기고, 이 아티스트만 크레딧된 앨범을 삭제 목록으로 보냅니다. 복구 가능.</span>
+          <span>아티스트는 남기고, 이 아티스트만 크레딧된 앨범을 즐겨찾기·별점·댓글과 함께 완전 삭제합니다. 다시 크롤되지 않습니다. 복구 불가.</span>
         </button>
 
         <button type="button" className={styles.confirmHard} disabled={pending} onClick={() => onPick('hard')}>
           아티스트와 모든 앨범 삭제
-          <span>참여한 앨범을 전부 완전 삭제합니다. 피처링으로만 참여한 다른 아티스트의 앨범도 사라지며, 즐겨찾기·별점·댓글까지 함께 지워집니다. 복구 불가.</span>
+          <span>참여한 앨범을 전부 완전 삭제합니다. 피처링으로만 참여한 다른 아티스트의 앨범도 사라지며, 즐겨찾기·별점·댓글까지 함께 지워집니다. 지운 앨범은 다시 크롤되지 않습니다. 복구 불가.</span>
         </button>
 
         <button type="button" className={styles.confirmCancel} onClick={onClose}>
