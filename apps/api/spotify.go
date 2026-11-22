@@ -695,10 +695,17 @@ func (s *server) adminSpotifyCrawlAlbum(w http.ResponseWriter, r *http.Request) 
 // 마이그레이션이 대표 크레딧 앨범 수로 시드하고, 이후는 아티스트 상세 토글이 관리.
 const releaseEligibleSQL = `FROM artists a WHERE a.releases_watch`
 
-// 한 스윕 안에서 같은 아티스트를 다시 집지 않게 막는 용도라 스윕 소요(3분 안팎)보다만 길면 된다.
-// 하루 두 번 도는 스윕이 매번 전원을 다시 보려면 스윕 간격보다 짧아야 한다.
+// releaseStaleSQL은 $1(cutoff)보다 먼저 확인한 아티스트만 고른다. 한 바퀴 안에서 같은 아티스트를
+// 다시 집지 않게 하는 조건이다. 서버 스윕은 스윕 시작 시각을 넘겨서, 10분 간격으로 붙어 도는
+// 스윕(18:10, 18:20)도 매번 전원을 다시 본다.
 const releaseStaleSQL = releaseEligibleSQL +
-	` AND (a.releases_checked_at IS NULL OR a.releases_checked_at < now() - interval '10 minutes')`
+	` AND (a.releases_checked_at IS NULL OR a.releases_checked_at < $1)`
+
+// 관리자 탭의 수동 실행은 배치 버튼을 여러 번 눌러 한 바퀴를 돈다. 그사이 본 아티스트를 다시 집지 않게
+// 이 시간 안에 확인한 아티스트는 뺀다.
+const manualRecheckGap = 10 * time.Minute
+
+func manualReleaseCutoff() time.Time { return time.Now().Add(-manualRecheckGap) }
 
 // GET /admin/spotify/releases-status — 신보 체크 현황 (대상/이번 주기 대기/Apple 미연결).
 // 경로는 Spotify 시절 그대로지만 대상 SQL은 소스 무관이라 Apple 신보 체크도 같이 쓴다.
@@ -709,7 +716,7 @@ func (s *server) adminReleasesStatus(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	if err := s.db.QueryRow(r.Context(), "SELECT COUNT(*)::int "+releaseStaleSQL).Scan(&stale); err != nil {
+	if err := s.db.QueryRow(r.Context(), "SELECT COUNT(*)::int "+releaseStaleSQL, manualReleaseCutoff()).Scan(&stale); err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
@@ -752,7 +759,7 @@ func (s *server) adminCheckReleases(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &body) {
 		return
 	}
-	res, err := s.checkReleasesBatch(r.Context(), body.Key, body.Limit)
+	res, err := s.checkReleasesBatch(r.Context(), body.Key, body.Limit, manualReleaseCutoff())
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -767,7 +774,7 @@ func (s *server) adminCheckReleases(w http.ResponseWriter, r *http.Request) {
 // 배치 계약: Spotify 오류가 나면 멈추고 부분 진행을 res.Error로 보고하며, 실패한
 // 아티스트는 스탬프가 안 찍혀 다음 호출이 다시 집는다. 아티스트 자체가 Spotify에서
 // 사라진 404는 스탬프만 찍고 넘어간다. 반환 error는 DB 장애(= HTTP 500)만.
-func (s *server) checkReleasesBatch(ctx context.Context, key string, limit int) (releaseCheckResult, error) {
+func (s *server) checkReleasesBatch(ctx context.Context, key string, limit int, cutoff time.Time) (releaseCheckResult, error) {
 	res := releaseCheckResult{Artists: []releaseCheckItem{}}
 	if limit < 1 || limit > 50 {
 		limit = 10
@@ -776,7 +783,7 @@ func (s *server) checkReleasesBatch(ctx context.Context, key string, limit int) 
 
 	rows, err := s.db.Query(ctx,
 		"SELECT a.id, COALESCE(a.display_name, a.name) "+releaseStaleSQL+
-			" ORDER BY a.releases_checked_at NULLS FIRST, a.id LIMIT $1", limit)
+			" ORDER BY a.releases_checked_at NULLS FIRST, a.id LIMIT $2", cutoff, limit)
 	if err != nil {
 		return res, err
 	}
@@ -873,7 +880,7 @@ func (s *server) checkReleasesBatch(ctx context.Context, key string, limit int) 
 		s.linkNewAlbums(ctx, newAlbumIDs) // 트랙 동기화가 UPC를 채운 뒤라야 Apple 매칭이 된다
 	}
 
-	if err := s.db.QueryRow(ctx, "SELECT COUNT(*)::int "+releaseStaleSQL).Scan(&res.Remaining); err != nil {
+	if err := s.db.QueryRow(ctx, "SELECT COUNT(*)::int "+releaseStaleSQL, cutoff).Scan(&res.Remaining); err != nil {
 		return res, err
 	}
 	return res, nil

@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -855,14 +856,14 @@ func (s *server) findAppleArtist(ctx context.Context, id string, name, displayNa
 // 저장한다. apple_id가 없는 아티스트는 이름 검색으로 연결을 시도하고, 못 맞추면 스탬프만
 // 찍고 Unlinked로 보고한다 (아티스트 상세에서 연결이 필요). 같은 배치 계약: Apple 오류면
 // 멈추고 res.Error로 보고하며 그 아티스트는 스탬프가 안 찍혀 다음 호출이 다시 집는다.
-func (s *server) checkAppleReleasesBatch(ctx context.Context, limit int) (releaseCheckResult, error) {
+func (s *server) checkAppleReleasesBatch(ctx context.Context, limit int, cutoff time.Time) (releaseCheckResult, error) {
 	res := releaseCheckResult{Artists: []releaseCheckItem{}}
 	if limit < 1 || limit > 50 {
 		limit = 10
 	}
 	rows, err := s.db.Query(ctx,
 		"SELECT a.id, COALESCE(a.display_name, a.name), a.name, a.display_name, COALESCE(a.aliases, '{}'), a.apple_id "+releaseStaleSQL+
-			" ORDER BY a.releases_checked_at NULLS FIRST, a.id LIMIT $1", limit)
+			" ORDER BY a.releases_checked_at NULLS FIRST, a.id LIMIT $2", cutoff, limit)
 	if err != nil {
 		return res, err
 	}
@@ -957,7 +958,7 @@ func (s *server) checkAppleReleasesBatch(ctx context.Context, limit int) (releas
 		res.Checked++
 	}
 
-	if err := s.db.QueryRow(ctx, "SELECT COUNT(*)::int "+releaseStaleSQL).Scan(&res.Remaining); err != nil {
+	if err := s.db.QueryRow(ctx, "SELECT COUNT(*)::int "+releaseStaleSQL, cutoff).Scan(&res.Remaining); err != nil {
 		return res, err
 	}
 	return res, nil
@@ -974,7 +975,7 @@ func (s *server) adminAppleCheckReleases(w http.ResponseWriter, r *http.Request)
 	if !requireApple(w) {
 		return
 	}
-	res, err := s.checkAppleReleasesBatch(r.Context(), body.Limit)
+	res, err := s.checkAppleReleasesBatch(r.Context(), body.Limit, manualReleaseCutoff())
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -988,12 +989,13 @@ func (s *server) sweepAppleReleases(ctx context.Context) {
 		log.Printf("release sweep: APPLE_MUSIC_* 미설정 — 건너뜀")
 		return
 	}
+	start := time.Now()
 	checked, albums := 0, 0
 	var unlinked, newIDs []string
 	// 중간에 오류로 끊겨도 그때까지 저장된 앨범은 알린다.
 	defer func() { s.notifyNewAlbums(ctx, newIDs) }()
 	for {
-		res, err := s.checkAppleReleasesBatch(ctx, sweepBatch)
+		res, err := s.checkAppleReleasesBatch(ctx, sweepBatch, start)
 		checked += res.Checked
 		albums += res.NewAlbums
 		unlinked = append(unlinked, res.Unlinked...)

@@ -7,12 +7,12 @@ import (
 	_ "time/tzdata" // distroless 이미지엔 zoneinfo가 없다 — Asia/Seoul을 바이너리에 넣는다
 )
 
-// 서버 자체 신보 스윕: 매일 06:05, 18:10 KST. 국내 음원은 대부분 18시에 공개돼서
-// 아침 스윕만 돌면 반나절 늦게 잡힌다. 관리자가 신보 체크 탭을 열지 않아도 돌게 하는
-// 것이 목적이고, 탭은 수동 실행용으로 그대로 둔다.
+// 서버 자체 신보 스윕: 매일 18:10, 18:20 KST. 국내 음원은 대부분 18시에 공개되는데
+// Apple 카탈로그에 늦게 올라오는 앨범이 있어서 10분 뒤에 한 번 더 본다. 관리자가 신보 체크
+// 탭을 열지 않아도 돌게 하는 것이 목적이고, 탭은 수동 실행용으로 그대로 둔다.
 const sweepBatch = 20
 
-var sweepTimes = [][2]int{{6, 5}, {18, 10}}
+var sweepTimes = [][2]int{{18, 10}, {18, 20}}
 
 // scheduleReleaseSweep은 다음 실행 시각까지 자고 스윕을 돌리길 반복한다.
 func (s *server) scheduleReleaseSweep(ctx context.Context) {
@@ -21,8 +21,10 @@ func (s *server) scheduleReleaseSweep(ctx context.Context) {
 		log.Printf("release sweep: Asia/Seoul 로드 실패, UTC로 진행: %v", err)
 		loc = time.UTC
 	}
+	// 다음 시각은 직전 예정 시각에서 고른다. 18:10 스윕이 18:20을 넘겨 끝나도 18:20 스윕을 건너뛰지 않고 바로 돈다.
+	next := time.Now().In(loc)
 	for {
-		next := nextSweep(time.Now().In(loc))
+		next = nextSweep(next)
 		log.Printf("release sweep: 다음 실행 %s", next.Format(time.RFC3339))
 		t := time.NewTimer(time.Until(next))
 		select {
@@ -60,10 +62,11 @@ func (s *server) sweepReleases(ctx context.Context) {
 	if len(keys) == 0 {
 		keys = []string{""} // 접두사 없는 기본 자격증명 한 쌍
 	}
+	start := time.Now()
 	checked, albums := 0, 0
 	for _, key := range keys {
 		for {
-			res, err := s.checkReleasesBatch(ctx, key, sweepBatch)
+			res, err := s.checkReleasesBatch(ctx, key, sweepBatch, start)
 			checked += res.Checked
 			albums += res.NewAlbums
 			if err != nil {
