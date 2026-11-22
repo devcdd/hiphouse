@@ -13,7 +13,7 @@ import { EditAlbumInfoButton } from '@/features/edit-album-info'
 import { EditAlbumArtistsButton } from '@/features/edit-album-artists'
 import { AwardSection } from '@/features/awards'
 import { useResolvedTheme } from '@/features/theme'
-import { startKakaoLogin } from '@/features/auth'
+import { useStartSignIn } from '@/features/auth'
 import { apiDelete, apiPost } from '@/shared/api/client'
 import { displayName } from '@/shared/lib/displayName'
 import { AlbumDetailSkeleton } from './AlbumDetailSkeleton'
@@ -29,6 +29,7 @@ export function AlbumDetailPage() {
   const navigate = useNavigate()
   const { data: album, isLoading: loading, error } = useAlbum(id)
   const { isAuthed, isAdmin } = useAuth()
+  const startSignIn = useStartSignIn()
   const theme = useResolvedTheme() // Apple 임베드는 ?theme=만 읽어 테마가 바뀌면 src 변경으로 다시 불러온다
   const favIds = useFavoriteIds(isAuthed)
   const ratings = useRatingMap(isAuthed)
@@ -119,7 +120,7 @@ export function AlbumDetailPage() {
               {isAuthed ? (
                 <FavoriteButton albumId={album.id} favorited={favIds.has(album.id)} variant="inline" />
               ) : (
-                <button type="button" className={styles.loginHint} onClick={startKakaoLogin}>
+                <button type="button" className={styles.loginHint} onClick={startSignIn}>
                   로그인하고 즐겨찾기
                 </button>
               )}

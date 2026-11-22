@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CornerDownRight, MessageSquare, Pencil, Trash2 } from 'lucide-react'
 import { useAuth } from '@/entities/session'
-import { startKakaoLogin } from '@/features/auth'
+import { useStartSignIn } from '@/features/auth'
 import type { Comment } from '@/features/album-comments/api/commentApi'
 import {
   useAddComment,
@@ -17,6 +17,7 @@ const fmt = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: '
 
 export function CommentSection({ albumId }: { albumId: string }) {
   const { user, isAuthed, isAdmin } = useAuth()
+  const startSignIn = useStartSignIn()
   const { threads, count, isLoading } = useComments(albumId)
   const add = useAddComment(albumId)
   const edit = useEditComment(albumId)
@@ -104,7 +105,7 @@ export function CommentSection({ albumId }: { albumId: string }) {
       {isAuthed ? (
         <CommentForm onSubmit={(body) => add.mutate({ body })} pending={add.isPending} />
       ) : (
-        <button type="button" className={styles.login} onClick={startKakaoLogin}>
+        <button type="button" className={styles.login} onClick={startSignIn}>
           로그인하고 댓글 남기기
         </button>
       )}

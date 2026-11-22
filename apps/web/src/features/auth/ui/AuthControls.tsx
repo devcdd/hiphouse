@@ -1,16 +1,17 @@
 import { Link } from 'react-router-dom'
 import { CircleUser, Settings } from 'lucide-react'
 import { useAuth } from '@/entities/session'
-import { startKakaoLogin } from '@/features/auth/lib/kakao'
+import { useStartSignIn } from '@/features/auth/lib/useStartSignIn'
 import styles from './AuthControls.module.css'
 
 export function AuthControls() {
   const { isAuthed, isAdmin, user, signOut } = useAuth()
+  const startSignIn = useStartSignIn()
 
   if (!isAuthed) {
     return (
-      <button type="button" className={styles.login} onClick={startKakaoLogin}>
-        카카오 로그인
+      <button type="button" className={styles.login} onClick={startSignIn}>
+        로그인
       </button>
     )
   }

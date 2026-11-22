@@ -2,11 +2,12 @@ import { AlbumCard, AlbumCardSkeleton } from '@/entities/album'
 import { useAuth } from '@/entities/session'
 import { useFavoriteAlbums } from '@/features/favorite-album'
 import { useMyGiven } from '@/features/rate-album'
-import { startKakaoLogin } from '@/features/auth'
+import { useStartSignIn } from '@/features/auth'
 import styles from './FavoritesPage.module.css'
 
 export function FavoritesPage() {
   const { isAuthed } = useAuth()
+  const startSignIn = useStartSignIn()
   const { data: albums, isLoading } = useFavoriteAlbums(isAuthed)
   const myGiven = useMyGiven(isAuthed)
 
@@ -14,8 +15,8 @@ export function FavoritesPage() {
     return (
       <div className={styles.page}>
         <p className={styles.state}>즐겨찾기는 로그인 후 이용할 수 있습니다.</p>
-        <button type="button" className={styles.login} onClick={startKakaoLogin}>
-          카카오 로그인
+        <button type="button" className={styles.login} onClick={startSignIn}>
+          로그인
         </button>
       </div>
     )

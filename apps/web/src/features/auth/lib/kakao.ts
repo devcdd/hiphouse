@@ -7,8 +7,8 @@ export function returnPath(raw: string | null): string {
 }
 
 // Redirect to Kakao's consent screen; it returns to /auth/kakao/callback?code=...&state=...
-// state에 현재 경로를 실어 로그인 후 보던 페이지로 복귀한다.
-export function startKakaoLogin() {
+// state에 next를 실어 로그인 후 로그인을 시작한 페이지로 복귀한다.
+export function startKakaoLogin(next: string) {
   if (!KAKAO_REST_KEY) {
     alert('카카오 로그인이 설정되지 않았습니다 (VITE_KAKAO_REST_API_KEY).')
     return
@@ -17,7 +17,6 @@ export function startKakaoLogin() {
   u.searchParams.set('client_id', KAKAO_REST_KEY)
   u.searchParams.set('redirect_uri', kakaoRedirectUri())
   u.searchParams.set('response_type', 'code')
-  const { pathname, search, hash } = window.location
-  u.searchParams.set('state', pathname + search + hash)
+  u.searchParams.set('state', returnPath(next))
   window.location.href = u.toString()
 }

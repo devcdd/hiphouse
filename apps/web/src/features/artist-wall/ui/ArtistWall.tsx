@@ -2,7 +2,7 @@ import { useCallback, useId, useLayoutEffect, useRef, useState, type FormEvent }
 import { Link } from 'react-router-dom'
 import { BadgeCheck, ChevronDown, MessagesSquare, SendHorizontal, Trash2 } from 'lucide-react'
 import { useAuth } from '@/entities/session'
-import { startKakaoLogin } from '@/features/auth'
+import { useStartSignIn } from '@/features/auth'
 import { Avatar } from '@/shared/ui/Avatar'
 import { useInfiniteScroll } from '@/shared/lib/useInfiniteScroll'
 import { WALL_MAX_LEN, type WallPost } from '@/features/artist-wall/api/wallApi'
@@ -69,6 +69,7 @@ export function ArtistWall({ artist }: { artist: WallArtist }) {
 function WallBody({ artist }: { artist: WallArtist }) {
   const artistId = artist.id
   const { user, isAuthed, isAdmin } = useAuth()
+  const startSignIn = useStartSignIn()
   const quota = useWallQuota(artistId, isAuthed).data
   const remaining = quota && !quota.unlimited ? Math.max(quota.limit - quota.used, 0) : null
   const blocked = remaining === 0
@@ -188,7 +189,7 @@ function WallBody({ artist }: { artist: WallArtist }) {
         </p>
       )}
       {!isAuthed && (
-        <button type="button" className={styles.login} onClick={startKakaoLogin}>
+        <button type="button" className={styles.login} onClick={startSignIn}>
           로그인하고 담벼락에 글 남기기
         </button>
       )}

@@ -10,6 +10,7 @@ import { FollowedArtistsPage, MyWallPostsPage, MyPageMenu, NicknamePage, RatedAl
 import { UserProfilePage } from '@/pages/user-profile'
 import { AdminPage } from '@/pages/admin'
 import { WelcomePage } from '@/pages/welcome'
+import { SignInPage } from '@/pages/sign-in'
 
 export function App() {
   return (
@@ -21,6 +22,7 @@ export function App() {
         <Route path="/users/:id" element={<UserProfilePage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/favorites" element={<FavoritesPage />} />
+        <Route path="/sign-in" element={<SignInPage />} />
         <Route path="/welcome" element={<WelcomePage />} />
         <Route path="/me" element={<MyPageMenu />} />
         <Route path="/me/nickname" element={<NicknamePage />} />

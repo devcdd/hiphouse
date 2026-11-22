@@ -9,8 +9,8 @@
   padding: 8px 14px;
   border: none;
   border-radius: 999px;
-  background: #fee500;
-  color: #191600;
+  background: var(--fg);
+  color: var(--bg);
   font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;

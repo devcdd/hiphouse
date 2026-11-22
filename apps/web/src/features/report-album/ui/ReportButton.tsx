@@ -1,6 +1,6 @@
 import { Flag, Languages } from 'lucide-react'
 import { useAuth } from '@/entities/session'
-import { startKakaoLogin } from '@/features/auth'
+import { useStartSignIn } from '@/features/auth'
 import { useMyFlags, useToggleFlag } from '@/features/report-album/model/useReports'
 import type { FlagKind } from '@/features/report-album/api/reportApi'
 import styles from './ReportButton.module.css'
@@ -15,13 +15,14 @@ const KINDS: Record<FlagKind, { icon: typeof Flag; idle: string; done: string }>
 
 export function ReportButton({ albumId, kind = 'not-hiphop' }: { albumId: string; kind?: FlagKind }) {
   const { isAuthed } = useAuth()
+  const startSignIn = useStartSignIn()
   const flags = useMyFlags(kind, isAuthed)
   const toggle = useToggleFlag(kind)
   const { icon: Icon, idle, done } = KINDS[kind]
 
   if (!isAuthed) {
     return (
-      <button type="button" className={styles.btn} onClick={startKakaoLogin}>
+      <button type="button" className={styles.btn} onClick={startSignIn}>
         <Icon size={14} strokeWidth={2.2} />
         {idle}
       </button>
