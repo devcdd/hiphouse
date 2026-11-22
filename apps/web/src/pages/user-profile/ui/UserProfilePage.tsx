@@ -6,7 +6,9 @@ import { AlbumCard, AlbumCardSkeleton } from '@/entities/album'
 import { RatedSortSelect, toRatedSortParam, useRatedSort } from '@/features/rate-album'
 import { useAuth, updateProfilePublic } from '@/entities/session'
 import type { User } from '@/entities/session'
+import { apiUrl } from '@/shared/config'
 import { useInfiniteScroll } from '@/shared/lib/useInfiniteScroll'
+import { Avatar } from '@/shared/ui/Avatar'
 import { useToast } from '@/shared/ui/toast'
 import { fetchPublicRatedAlbums, fetchPublicUser, RATED_PAGE_SIZE } from '../api/userApi'
 import styles from './UserProfilePage.module.css'
@@ -46,20 +48,23 @@ export function UserProfilePage() {
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <div className={styles.headerMain}>
-          <h1 className={styles.title}>{u?.nickname || '　'}</h1>
-          {u && (
-            <p className={styles.stats}>
-              {!hidden && (
-                <>
-                  평가 {u.rating_count}개
-                  {u.rating_avg != null && <> · 평균 ★{u.rating_avg.toFixed(1)}</>}
-                  {u.comment_count > 0 && <> · 댓글 {u.comment_count}개</>}
-                </>
-              )}
-              <span className={styles.joined}>{joined.format(new Date(u.created_at))} 가입</span>
-            </p>
-          )}
+        <div className={styles.identity}>
+          {u && <Avatar src={u.avatar_url ? apiUrl(u.avatar_url) : null} name={u.nickname || u.id} size={64} />}
+          <div className={styles.headerMain}>
+            <h1 className={styles.title}>{u?.nickname || '　'}</h1>
+            {u && (
+              <p className={styles.stats}>
+                {!hidden && (
+                  <>
+                    평가 {u.rating_count}개
+                    {u.rating_avg != null && <> · 평균 ★{u.rating_avg.toFixed(1)}</>}
+                    {u.comment_count > 0 && <> · 댓글 {u.comment_count}개</>}
+                  </>
+                )}
+                <span className={styles.joined}>{joined.format(new Date(u.created_at))} 가입</span>
+              </p>
+            )}
+          </div>
         </div>
         {isOwner && <PrivacyToggle />}
       </header>

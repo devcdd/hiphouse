@@ -123,7 +123,7 @@ button.menuItem {
   background: var(--bg);
 }
 
-/* --- nickname editor (/me/nickname) --- */
+/* --- profile editor (/me/nickname) --- */
 .card {
   display: flex;
   flex-direction: column;
@@ -176,6 +176,41 @@ button.menuItem {
 .save:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+.avatarRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.avatarActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.secondary {
+  flex: 0 0 auto;
+  padding: 9px 18px;
+  border: none;
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.secondary:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
 }
 
 /* --- album grid (/me/rated) --- */

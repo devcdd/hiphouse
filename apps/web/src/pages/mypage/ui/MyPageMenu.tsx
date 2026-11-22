@@ -7,7 +7,7 @@ import styles from './MyPage.module.css'
 // /me — 각 섹션으로 들어가는 진입 메뉴. 공개 설정은 여기 없다. 공개 프로필 페이지에
 // 붙어 있어야 "남에게 어떻게 보이나"를 그 자리에서 확인하며 끄고 켤 수 있다.
 const ITEMS = [
-  { to: '/me/nickname', label: '닉네임 수정하기', Icon: Pencil },
+  { to: '/me/nickname', label: '프로필 수정하기', Icon: Pencil },
   { to: '/me/rated', label: '내가 평가한 앨범', Icon: Star },
   { to: '/favorites', label: '내가 즐겨찾기 한 앨범', Icon: Heart },
   { to: '/me/following', label: '내가 팔로우한 아티스트', Icon: UserPlus },

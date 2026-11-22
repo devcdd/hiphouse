@@ -79,4 +79,8 @@ export const apiPost = <T,>(path: string, body?: unknown): Promise<T> =>
 export const apiPut = <T,>(path: string, body?: unknown): Promise<T> =>
   request<T>(API_BASE + path, jsonInit('PUT', body))
 
-export const apiDelete = <T,>(path: string): Promise<T> => request<T>(API_BASE + path, { method: 'DELETE' })
+// 이미지처럼 JSON이 아닌 본문을 그대로 보낸다. Content-Type은 blob.type을 쓴다.
+export const apiPutBlob = <T,>(path: string, blob: Blob): Promise<T> =>
+  request<T>(API_BASE + path, { method: 'PUT', headers: { 'Content-Type': blob.type }, body: blob })
+
+export const apiDelete =<T,>(path: string): Promise<T> => request<T>(API_BASE + path, { method: 'DELETE' })

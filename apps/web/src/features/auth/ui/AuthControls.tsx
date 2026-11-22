@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { CircleUser, Settings } from 'lucide-react'
 import { useAuth } from '@/entities/session'
+import { apiUrl } from '@/shared/config'
 import { useStartSignIn } from '@/features/auth/lib/useStartSignIn'
 import styles from './AuthControls.module.css'
 
@@ -24,7 +25,11 @@ export function AuthControls() {
         </Link>
       )}
       <Link to="/me" className={styles.me} title="마이페이지">
-        <CircleUser size={17} aria-hidden />
+        {user?.avatar_url ? (
+          <img src={apiUrl(user.avatar_url)} alt="" className={styles.avatar} />
+        ) : (
+          <CircleUser size={17} aria-hidden />
+        )}
         <span className={styles.name}>{user?.nickname || '사용자'}</span>
       </Link>
       <button type="button" className={styles.logout} onClick={signOut}>

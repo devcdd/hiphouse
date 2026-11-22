@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut } from '@/shared/api/client'
+import { apiDelete, apiGet, apiPost, apiPut, apiPutBlob } from '@/shared/api/client'
 import type { User } from '@/entities/session/model/types'
 
 export function fetchMe(): Promise<User> {
@@ -13,6 +13,15 @@ export function updateNickname(nickname: string): Promise<User> {
 // 프로필 공개 여부 토글. 끄면 공개 프로필에 닉네임과 가입일만 남는다.
 export function updateProfilePublic(profile_public: boolean): Promise<User> {
   return apiPut<User>('/me', { profile_public })
+}
+
+// 서버는 256KB, 1024px까지만 받는다. 원본 사진은 resizeAvatar로 줄여서 보낸다.
+export function uploadAvatar(image: Blob): Promise<User> {
+  return apiPutBlob<User>('/me/avatar', image)
+}
+
+export function deleteAvatar(): Promise<User> {
+  return apiDelete<User>('/me/avatar')
 }
 
 export interface Session {

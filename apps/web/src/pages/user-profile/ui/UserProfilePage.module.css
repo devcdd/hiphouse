@@ -15,6 +15,13 @@
   flex-wrap: wrap;
 }
 
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
 .headerMain {
   display: flex;
   flex-direction: column;
