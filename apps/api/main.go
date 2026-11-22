@@ -534,6 +534,24 @@ func (s *server) ensureAuthSchema(ctx context.Context) error {
 			AFTER INSERT OR UPDATE OF deleted_at OR DELETE ON comments
 			FOR EACH ROW EXECUTE FUNCTION albums_comment_counters();
 
+		-- Instrumental 앨범은 소프트 삭제 상태로만 들어오게 한다. 앨범을 넣는 경로가 Spotify 크롤,
+		-- Apple 크롤, 관리자 수동 추가, Node 크롤러로 넷이라 한 곳에서 막는다. 행은 남겨서
+		-- 다음 크롤에서 같은 앨범을 다시 새 앨범으로 받지 않는다. "3Songs & Instrumentals"처럼
+		-- 보컬곡과 묶인 앨범은 남긴다. BEFORE INSERT라 ON CONFLICT DO UPDATE로 기존 행을 고칠 때는
+		-- deleted_at이 SET에 없어서 관리자가 복구한 앨범은 다시 지워지지 않는다.
+		CREATE OR REPLACE FUNCTION albums_hide_instrumental() RETURNS trigger AS $fn$
+		BEGIN
+			IF NEW.name ~* 'instrumental'
+			   AND NEW.name !~* '(&|\+| and )\s*instrumental|instrumentals?\s*(&|\+| and)' THEN
+				NEW.deleted_at := COALESCE(NEW.deleted_at, now());
+			END IF;
+			RETURN NEW;
+		END $fn$ LANGUAGE plpgsql;
+
+		CREATE OR REPLACE TRIGGER trg_albums_hide_instrumental
+			BEFORE INSERT ON albums
+			FOR EACH ROW EXECUTE FUNCTION albums_hide_instrumental();
+
 		-- Reconcile on boot: backfills the columns the first time and self-heals any
 		-- drift afterwards (a trigger added mid-flight, a manual SQL fix). Touches
 		-- only rows that are actually wrong, so a healthy DB writes nothing.
