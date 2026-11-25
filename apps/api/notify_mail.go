@@ -383,7 +383,7 @@ var newAlbumsHTML = template.Must(template.New("html").Parse(`<!doctype html>
 </td></tr>
 
 <tr><td align="center" style="padding:18px 28px 36px;">
-<a href="{{.SiteURL}}" style="display:inline-block;background:#111111;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 30px;border-radius:999px;">hiphouse에서 평가하기</a>
+<a href="{{.SiteURL}}" style="display:inline-block;background:#111111;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 30px;border-radius:999px;">힙집에서 평가하기</a>
 </td></tr>
 
 <tr><td style="background:#f7f7f7;padding:20px 28px;font-size:12px;line-height:1.6;color:#8a8a8a;">
