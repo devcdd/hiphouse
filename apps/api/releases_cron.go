@@ -23,6 +23,9 @@ func (s *server) scheduleReleaseSweep(ctx context.Context) {
 	}
 	// 다음 시각은 직전 예정 시각에서 고른다. 18:10 스윕이 18:20을 넘겨 끝나도 18:20 스윕을 건너뛰지 않고 바로 돈다.
 	next := time.Now().In(loc)
+	// 앞선 스윕이 찾은 앨범은 모아 두었다가 그날 마지막 스윕에서 메일 한 통으로 보낸다.
+	// 메모리에만 두므로 그 사이에 재시작하면 앞선 스윕분은 메일에서 빠진다.
+	var pending []string
 	for {
 		next = nextSweep(next)
 		log.Printf("release sweep: 다음 실행 %s", next.Format(time.RFC3339))
@@ -34,9 +37,18 @@ func (s *server) scheduleReleaseSweep(ctx context.Context) {
 		case <-t.C:
 		}
 		// Spotify 계정이 막혀 신보 감지는 Apple로 돈다. 복구되면 sweepReleases로 되돌린다.
-		s.sweepAppleReleases(ctx)
+		pending = append(pending, s.sweepAppleReleases(ctx)...)
 		s.sweepApple(ctx)
+		if isLastSweep(next) {
+			s.notifyNewAlbums(ctx, pending)
+			pending = nil
+		}
 	}
+}
+
+func isLastSweep(t time.Time) bool {
+	last := sweepTimes[len(sweepTimes)-1]
+	return t.Hour() == last[0] && t.Minute() == last[1]
 }
 
 // nextSweep은 now 이후 가장 가까운 sweepTimes 시각을 고른다. 벽시계만 보고 정해서

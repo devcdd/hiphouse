@@ -24,7 +24,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// 신보 스윕이 새로 담은 앨범을 스윕 한 번에 메일 한 통으로 알린다.
+// 그날 신보 스윕들이 새로 담은 앨범을 마지막 스윕 뒤에 메일 한 통으로 알린다.
 // SMTP_USER와 SMTP_PASSWORD가 없으면 아무것도 보내지 않는다.
 
 type mailConfig struct {

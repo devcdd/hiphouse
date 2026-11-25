@@ -983,17 +983,16 @@ func (s *server) adminAppleCheckReleases(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, 200, res)
 }
 
-// sweepAppleReleases — 서버 스윕용. 남은 대상이 0이 될 때까지 Apple 신보 배치를 반복한다.
-func (s *server) sweepAppleReleases(ctx context.Context) {
+// sweepAppleReleases — 서버 스윕용. 남은 대상이 0이 될 때까지 Apple 신보 배치를 반복하고
+// 새로 저장한 앨범 ID를 돌려준다. 중간에 오류로 끊겨도 그때까지 저장된 앨범은 돌려준다.
+func (s *server) sweepAppleReleases(ctx context.Context) (newIDs []string) {
 	if !appleConfigured() {
 		log.Printf("release sweep: APPLE_MUSIC_* 미설정 — 건너뜀")
-		return
+		return nil
 	}
 	start := time.Now()
 	checked, albums := 0, 0
-	var unlinked, newIDs []string
-	// 중간에 오류로 끊겨도 그때까지 저장된 앨범은 알린다.
-	defer func() { s.notifyNewAlbums(ctx, newIDs) }()
+	var unlinked []string
 	for {
 		res, err := s.checkAppleReleasesBatch(ctx, sweepBatch, start)
 		checked += res.Checked

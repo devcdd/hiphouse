@@ -40,3 +40,17 @@ func TestNextSweep(t *testing.T) {
 		prev = got
 	}
 }
+
+func TestIsLastSweep(t *testing.T) {
+	loc, err := time.LoadLocation("Asia/Seoul")
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := func(h, m int) time.Time { return time.Date(2026, 11, 17, h, m, 0, 0, loc) }
+	if isLastSweep(at(18, 10)) {
+		t.Fatal("18:10은 마지막 스윕이 아님")
+	}
+	if !isLastSweep(at(18, 20)) {
+		t.Fatal("18:20은 마지막 스윕이어야 함")
+	}
+}
