@@ -61,10 +61,7 @@ function AdminModeToggle() {
       onClick={() => setAdminMode(!on)}
     >
       <ShieldCheck size={18} className={styles.menuIcon} aria-hidden />
-      <span className={styles.menuLabel}>
-        관리자 모드
-        <span className={styles.menuHint}>끄면 관리 도구를 숨기고 일반 사용자 화면으로 봅니다</span>
-      </span>
+      <span className={styles.menuLabel}>관리자 모드</span>
       <span className={on ? `${styles.switch} ${styles.switchOn}` : styles.switch} aria-hidden />
     </button>
   )

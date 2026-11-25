@@ -83,14 +83,6 @@ button.menuItem {
   cursor: pointer;
 }
 
-.menuHint {
-  display: block;
-  margin-top: 3px;
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 500;
-}
-
 .switch {
   position: relative;
   flex: 0 0 auto;
